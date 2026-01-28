@@ -27,30 +27,33 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Cabeçalho
+# 3. Cabeçalho do App
 st.title("🚚 Estrategista das Rotas")
 st.markdown("### Filtro de Romaneio para o Circuit")
+st.info("Suba o arquivo original da Shopee e gere sua lista de paradas organizada.")
 
-# 4. Interface
+# 4. Interface de Entrada
 col1, col2 = st.columns([2, 1])
+
 with col1:
     arquivo_upload = st.file_uploader("1. Selecione o Romaneio (.xlsx)", type=["xlsx"])
 with col2:
     gaiola_alvo = st.text_input("2. Sua Gaiola", value="F-27").strip().upper()
 
+# 5. Botão de Ação
 botao_filtrar = st.button("FILTRAR ROTA AGORA")
 
-# 5. Processamento Passo a Passo
+# 6. Lógica de Processamento
 if arquivo_upload is not None and botao_filtrar:
     try:
         with st.spinner('Escaneando pacotes...'):
-            # Lendo o arquivo - engine openpyxl é a melhor para o seu caso
+            # Lendo o Excel (ignora cores e estilos)
             df = pd.read_excel(arquivo_upload, engine='openpyxl')
             
-            # Padronizando colunas (Maiúsculas e sem espaços)
+            # Limpeza e Padronização de Colunas
             df.columns = [str(c).strip().upper() for c in df.columns]
             
-            # Identificação das colunas
+            # Identificação Dinâmica das Colunas
             col_gaiola = next((c for c in df.columns if 'GAIOLA' in c), None)
             col_end = next((c for c in df.columns if 'ENDERE' in c or 'LOGRA' in c), None)
             col_bairro = next((c for c in df.columns if 'BAIRRO' in c), None)
@@ -58,57 +61,64 @@ if arquivo_upload is not None and botao_filtrar:
             col_cidade = next((c for c in df.columns if 'CIDADE' in c), None)
 
             if col_gaiola and col_end:
-                # Limpeza preventiva: converte tudo para string e remove espaços
+                # Limpeza preventiva dos nomes das gaiolas
                 df[col_gaiola] = df[col_gaiola].astype(str).str.strip().str.upper()
                 
-                # Filtro inteligente (ignora o traço '-')
+                # Filtro Inteligente (ignora o traço '-')
                 alvo_limpo = gaiola_alvo.replace("-", "")
                 df_filtrado = df[df[col_gaiola].str.replace("-", "") == alvo_limpo].copy()
 
                 if not df_filtrado.empty:
-                    # LIMPEZA DE DADOS: Substitui células vazias (NaN) por texto vazio
+                    # Remove valores nulos para evitar o texto "nan" nos endereços
                     df_filtrado = df_filtrado.fillna("")
 
-                    # Criando o arquivo de saída
+                    # Criando o DataFrame para o Circuit
                     saida = pd.DataFrame()
                     saida['Gaiola'] = df_filtrado[col_gaiola]
                     
-                    # Lógica da Sequência
+                    # Lógica da Sequência (se não existir, cria uma de 1 até o total)
                     if col_seq:
                         saida['Sequencia'] = df_filtrado[col_seq]
                     else:
                         saida['Sequencia'] = range(1, len(df_filtrado) + 1)
                     
-                    # Formatação do Endereço Completo
-                    cid = df_filtrado[col_cidade].astype(str) if col_cidade else "Fortaleza"
-                    bai = df_filtrado[col_bairro].astype(str) if col_bairro else "Bairro"
+                    # Formatação do Endereço (Ideal para o GPS de Fortaleza)
+                    cidade = df_filtrado[col_cidade].astype(str) if col_cidade else "Fortaleza"
+                    bairro = df_filtrado[col_bairro].astype(str) if col_bairro else "Bairro"
                     
                     saida['Endereco_Completo'] = (
                         df_filtrado[col_end].astype(str) + ", " + 
-                        bai + ", " + cid + " - CE"
+                        bairro + ", " + 
+                        cidade + " - CE"
                     )
 
-                    # Preparando o Download
+                    # --- PREPARAÇÃO DO DOWNLOAD (FIX ANDROID) ---
                     output = io.BytesIO()
-                    # O uso do context manager 'with' garante que o arquivo seja fechado corretamente
                     with pd.ExcelWriter(output, engine='openpyxl') as writer:
                         saida.to_excel(writer, index=False)
                     
-                    st.success(f"✅ {len(df_filtrado)} pacotes encontrados!")
+                    # Nome simplificado para evitar erros no gerenciador do Android
+                    nome_arquivo = f"ROTA_{gaiola_alvo.replace('-', '_')}.xlsx"
+                    
+                    st.success(f"✅ Sucesso! {len(df_filtrado)} pacotes encontrados.")
                     
                     st.download_button(
                         label="📥 BAIXAR LISTA PARA O CIRCUIT",
                         data=output.getvalue(),
-                        file_name=f"Rota_{gaiola_alvo}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        file_name=nome_arquivo,
+                        mime="application/vnd.ms-excel" # Tipo de arquivo mais compatível com celular
                     )
                 else:
                     st.error(f"❌ Nenhuma entrega encontrada para a gaiola {gaiola_alvo}.")
             else:
-                st.warning("⚠️ Não encontrei as colunas necessárias no arquivo.")
+                st.warning("⚠️ Arquivo inválido. Certifique-se de que é o Romaneio original da Shopee.")
 
     except Exception as e:
-        st.error(f"Erro ao processar: {e}")
+        st.error(f"Erro ao processar o arquivo: {e}")
 
+elif botao_filtrar and arquivo_upload is None:
+    st.warning("Por favor, selecione o arquivo do Romaneio primeiro.")
+
+# Rodapé
 st.divider()
-st.caption("Estrategista das Rotas v1.1")
+st.caption("Estrategista das Rotas v1.2 - Fortaleza, CE")

@@ -23,38 +23,34 @@ st.markdown("""
     div.stButton > button:first-child:hover {
         background-color: #d73211;
         color: white;
-        border: none;
     }
     </style>
-    """, unsafe_allow_html=True) # <-- CORREÇÃO APLICADA AQUI
+    """, unsafe_allow_html=True)
 
-# 3. Cabeçalho do App
+# 3. Cabeçalho
 st.title("🚚 Estrategista das Rotas")
-st.markdown("### Filtro de Romaneio Profissional para o Circuit")
-st.info("Suba o arquivo original da Shopee e gere sua lista de paradas limpa e organizada.")
+st.markdown("### Filtro de Romaneio para o Circuit")
 
-# 4. Interface de Entrada
+# 4. Interface
 col1, col2 = st.columns([2, 1])
-
 with col1:
-    arquivo_upload = st.file_uploader("Selecione o Romaneio (.xlsx)", type=["xlsx"])
+    arquivo_upload = st.file_uploader("1. Selecione o Romaneio (.xlsx)", type=["xlsx"])
 with col2:
-    gaiola_alvo = st.text_input("Sua Gaiola", value="F-27").strip().upper()
+    gaiola_alvo = st.text_input("2. Sua Gaiola", value="F-27").strip().upper()
 
-# 5. Botão de Ação
 botao_filtrar = st.button("FILTRAR ROTA AGORA")
 
-# 6. Lógica de Processamento
+# 5. Processamento Passo a Passo
 if arquivo_upload is not None and botao_filtrar:
     try:
-        with st.spinner('Escaneando base de dados...'):
-            # Lendo o Excel (ignora cores e estilos)
+        with st.spinner('Escaneando pacotes...'):
+            # Lendo o arquivo - engine openpyxl é a melhor para o seu caso
             df = pd.read_excel(arquivo_upload, engine='openpyxl')
             
-            # Limpeza e Padronização de Colunas
+            # Padronizando colunas (Maiúsculas e sem espaços)
             df.columns = [str(c).strip().upper() for c in df.columns]
             
-            # Identificação Dinâmica das Colunas
+            # Identificação das colunas
             col_gaiola = next((c for c in df.columns if 'GAIOLA' in c), None)
             col_end = next((c for c in df.columns if 'ENDERE' in c or 'LOGRA' in c), None)
             col_bairro = next((c for c in df.columns if 'BAIRRO' in c), None)
@@ -62,17 +58,57 @@ if arquivo_upload is not None and botao_filtrar:
             col_cidade = next((c for c in df.columns if 'CIDADE' in c), None)
 
             if col_gaiola and col_end:
-                # Filtro Inteligente (Aceita F-27 ou F27)
-                alvo_limpo = gaiola_alvo.replace("-", "")
+                # Limpeza preventiva: converte tudo para string e remove espaços
                 df[col_gaiola] = df[col_gaiola].astype(str).str.strip().str.upper()
                 
-                # Mascara de busca que ignora o traço
+                # Filtro inteligente (ignora o traço '-')
+                alvo_limpo = gaiola_alvo.replace("-", "")
                 df_filtrado = df[df[col_gaiola].str.replace("-", "") == alvo_limpo].copy()
 
                 if not df_filtrado.empty:
-                    st.success(f"✅ Sucesso! Encontramos {len(df_filtrado)} pacotes na {gaiola_alvo}.")
-                    
-                    # Criação do DataFrame para o Circuit
+                    # LIMPEZA DE DADOS: Substitui células vazias (NaN) por texto vazio
+                    df_filtrado = df_filtrado.fillna("")
+
+                    # Criando o arquivo de saída
                     saida = pd.DataFrame()
                     saida['Gaiola'] = df_filtrado[col_gaiola]
-                    saida['Sequencia'] = df_filtrado[col_seq] if col_seq
+                    
+                    # Lógica da Sequência
+                    if col_seq:
+                        saida['Sequencia'] = df_filtrado[col_seq]
+                    else:
+                        saida['Sequencia'] = range(1, len(df_filtrado) + 1)
+                    
+                    # Formatação do Endereço Completo
+                    cid = df_filtrado[col_cidade].astype(str) if col_cidade else "Fortaleza"
+                    bai = df_filtrado[col_bairro].astype(str) if col_bairro else "Bairro"
+                    
+                    saida['Endereco_Completo'] = (
+                        df_filtrado[col_end].astype(str) + ", " + 
+                        bai + ", " + cid + " - CE"
+                    )
+
+                    # Preparando o Download
+                    output = io.BytesIO()
+                    # O uso do context manager 'with' garante que o arquivo seja fechado corretamente
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        saida.to_excel(writer, index=False)
+                    
+                    st.success(f"✅ {len(df_filtrado)} pacotes encontrados!")
+                    
+                    st.download_button(
+                        label="📥 BAIXAR LISTA PARA O CIRCUIT",
+                        data=output.getvalue(),
+                        file_name=f"Rota_{gaiola_alvo}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                else:
+                    st.error(f"❌ Nenhuma entrega encontrada para a gaiola {gaiola_alvo}.")
+            else:
+                st.warning("⚠️ Não encontrei as colunas necessárias no arquivo.")
+
+    except Exception as e:
+        st.error(f"Erro ao processar: {e}")
+
+st.divider()
+st.caption("Estrategista das Rotas v1.1")

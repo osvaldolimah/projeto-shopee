@@ -30,7 +30,7 @@ st.markdown("""
 # 3. Cabeçalho do App
 st.title("🚚 Filtro de Romaneios")
 st.markdown("### Baixe a Planilha da sua Gaiola para o Circuit")
-st.info("Suba o arquivo original da Shopee e gere sua lista de paradas organizada.")
+st.info("Suba o arquivo de romaneio e gere sua lista de paradas organizada.")
 
 # 4. Interface de Entrada
 col1, col2 = st.columns([2, 1])

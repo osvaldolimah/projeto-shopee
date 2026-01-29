@@ -3,7 +3,7 @@ import pandas as pd
 import io
 
 # 1. Configuração da Página
-st.set_page_config(page_title="Estrategista das Rotas", page_icon="🚚", layout="centered")
+st.set_page_config(page_title="Filtro de Romaneios", page_icon="🚚", layout="centered")
 
 # 2. Estilo CSS para o Botão Laranja Shopee
 st.markdown("""
@@ -28,8 +28,8 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 3. Cabeçalho do App
-st.title("🚚 Estrategista das Rotas")
-st.markdown("### Filtro de Romaneio para o Circuit")
+st.title("🚚 Filtro de Romaneios")
+st.markdown("### Baixe a Planilha da sua Gaiola para o Circuit")
 st.info("Suba o arquivo original da Shopee e gere sua lista de paradas organizada.")
 
 # 4. Interface de Entrada

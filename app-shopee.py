@@ -38,7 +38,7 @@ col1, col2 = st.columns([2, 1])
 with col1:
     arquivo_upload = st.file_uploader("1. Selecione o Romaneio (.xlsx)", type=["xlsx"])
 with col2:
-    gaiola_alvo = st.text_input("2. Sua Gaiola", value="F-27").strip().upper()
+    gaiola_alvo = st.text_input("2. Sua Gaiola", value="Digite sua Gaiola").strip().upper()
 
 # 5. Botão de Ação
 botao_filtrar = st.button("FILTRAR ROTA AGORA")

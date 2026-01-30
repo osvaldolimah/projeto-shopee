@@ -63,7 +63,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 3. Cabeçalho do App
-st.title("🚚 Estrategista das Rotas")
+st.title("🚚 Rastreador de Garapas")
 st.markdown("Filtre seu romaneio para o **Circuit** em segundos.")
 
 # 4. Interface de Entrada
@@ -153,4 +153,4 @@ elif botao_filtrar and arquivo_upload is None:
 
 # Rodapé
 st.divider()
-st.caption("Estrategista das Rotas v1.3 - Fortaleza, CE")
+st.caption("Rastreador de Garapas v1.3 - Fortaleza, CE")

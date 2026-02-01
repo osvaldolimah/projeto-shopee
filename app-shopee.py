@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import io
 
-# Configuração da página para melhor visualização em Tablets e Celulares
-st.set_page_config(page_title="Estrategista das Rotas Pro", page_icon="🚚", layout="wide")
+# Configuração da página e do título na aba do navegador
+st.set_page_config(page_title="Filtro de Rotas para o Circuit", page_icon="🚚", layout="wide")
 
 # --- CUSTOMIZAÇÃO CSS ---
 st.markdown("""
@@ -31,7 +31,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🚚 Estrategista das Rotas")
+st.title("🚚 Filtro de Rotas para o Circuit")
 
 # 1. Entrada de Arquivo
 arquivo_upload = st.file_uploader("Selecione o arquivo Romaneio", type=["xlsx"])
@@ -93,7 +93,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                         larguras = [len(str(x)) for x in dados_filtrados.iloc[0]]
                         col_end_idx = larguras.index(max(larguras))
 
-                    # --- LÓGICA DE PARADAS REAIS (AGRUPAMENTO) ---
+                    # --- LÓGICA DE PARADAS REAIS ---
                     dados_filtrados['CHAVE_STOP'] = dados_filtrados[col_end_idx].apply(extrair_base_endereco)
                     unicos = dados_filtrados['CHAVE_STOP'].unique()
                     mapa_stops = {end: i + 1 for i, end in enumerate(unicos)}
@@ -108,7 +108,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = endereco_original + ", " + bairro + "Fortaleza - CE"
 
-                    # Métricas de Operação Simplificadas
+                    # Métricas de Operação
                     c1, c2 = st.columns(2)
                     c1.metric("📦 Pacotes", len(saida))
                     c2.metric("📍 Paradas Reais", len(unicos))

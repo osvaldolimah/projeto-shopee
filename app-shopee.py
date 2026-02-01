@@ -2,9 +2,12 @@ import streamlit as st
 import pandas as pd
 import io
 import unicodedata
+import time
+# Novas importações para o mapa profissional
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
-import time
+import folium
+from streamlit_folium import st_folium
 
 # Configuração da página
 st.set_page_config(page_title="Filtro de Rotas para o Circuit", page_icon="🚚", layout="wide")
@@ -29,11 +32,12 @@ st.title("🚚 Filtro de Rotas para o Circuit")
 arquivo_upload = st.file_uploader("Selecione o arquivo Romaneio", type=["xlsx"])
 gaiola_alvo = st.text_input("Digite o código da Gaiola", placeholder="Ex: B-50").strip().upper()
 
-# Nova funcionalidade: Checkbox para o mapa
-visualizar_mapa = st.checkbox("📍 Gerar mapa da rota (Leva aprox. 1s por parada)", value=False)
+# Checkbox para ativar o mapa
+visualizar_mapa = st.checkbox("📍 Gerar mapa interativo (Aprox. 1s por parada)", value=False)
 
 botao_executar = st.button("🚀 GERAR ROTA")
 
+# --- FUNÇÕES AUXILIARES (Sua lógica de negócio) ---
 def remover_acentos(texto):
     return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()
@@ -54,15 +58,14 @@ def identificar_comercio(endereco):
         'LOJA', 'MERCADO', 'MERCEARIA', 'FARMACIA', 'DROGARIA', 'SHOPPING', 'CLINICA', 
         'HOSPITAL', 'POSTO', 'OFICINA', 'RESTAURANTE', 'LANCHONETE', 'PADARIA', 'PANIFICADORA',
         'ACADEMIA', 'ESCOLA', 'COLEGIO', 'FACULDADE', 'IGREJA', 'TEMPLO',
-        'EMPRESA', 'LTDA', 'MEI', 'SALA', 'SALAO', 'BARBEARIA', 'ESTACIONAMENTO', 'HOTEL', 
-        'SUPERMERCADO', 'AMC', 'ATACADO', 'DISTRIBUIDORA', 'AUTOPECAS', 'VIDRAÇARIA', 
-        'LABORATORIO', 'CLUBE', 'ASSOCIACAO', 'BOUTIQUE', 'MERCANTIL',
-        'DEPARTAMENTO', 'VARIEDADES', 'PIZZARIA', 'CHURRASCARIA', 'CARNES', 'PEIXARIA', 
-        'FRUTARIA', 'HORTIFRUTI', 'FLORICULTURA'
+        'EMPRESA', 'LTDA', 'MEI', 'SALA', 'SALAO', 'BARBEARIA', 'ESTACIONAMENTO', 'HOTEL', 'SUPERMERCADO', 'AMC', 'ATACADO', 'DISTRIBUIDORA', 'AUTOPECAS', 'VIDRAÇARIA', 'LABORATORIO', 'CLUBE', 'ASSOCIACAO', 'BOUTIQUE', 'MERCANTIL',
+        'DEPARTAMENTO', 'VARIEDADES', 'PIZZARIA', 'CHURRASCARIA', 'CARNES', 'PEIXARIA', 'FRUTARIA', 'HORTIFRUTI', 'FLORICULTURA'
     ]
     termos_anuladores = ['FRENTE', 'LADO', 'PROXIMO', 'VIZINHO', 'DEFRONTE', 'ATRAS', 'DEPOIS', 'PERTO', 'VIZINHA']
+    
     end_limpo = remover_acentos(endereco)
     partes = end_limpo.split(',')
+    
     for parte in partes:
         palavras = parte.split()
         for i, palavra in enumerate(palavras):
@@ -75,6 +78,7 @@ def identificar_comercio(endereco):
                     return "🏪 Comércio"
     return "🏠 Residencial"
 
+# --- PROCESSAMENTO PRINCIPAL ---
 if arquivo_upload is not None and gaiola_alvo and botao_executar:
     with st.spinner('🔄 Processando dados...'):
         try:
@@ -108,7 +112,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                         larguras = [len(str(x)) for x in dados_filtrados.iloc[0]]
                         col_end_idx = larguras.index(max(larguras))
 
-                    # Processamento base
+                    # Processamento dos dados
                     dados_filtrados['CHAVE_STOP'] = dados_filtrados[col_end_idx].apply(extrair_base_endereco)
                     unicos = dados_filtrados['CHAVE_STOP'].unique()
                     mapa_stops = {end: i + 1 for i, end in enumerate(unicos)}
@@ -122,40 +126,72 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro_raw = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = endereco_original + ", " + bairro_raw + "Fortaleza - CE"
 
-                    # --- LÓGICA DO MAPA (GEOCODIFICAÇÃO) ---
+                    # --- LÓGICA DO MAPA PROFISSIONAL (FOLIUM) ---
                     if visualizar_mapa:
-                        st.subheader("📍 Visualização Geográfica da Rota")
-                        geolocator = Nominatim(user_agent="estratega_rotas_fortaleza")
-                        coords = []
+                        st.subheader("📍 Visualização da Rota")
+                        geolocator = Nominatim(user_agent="estratega_rotas_pro_v2")
+                        coords_validas = []
+                        falhas_geocoding = 0
+                        
+                        # Prepara a barra de progresso
                         progress_bar = st.progress(0)
                         status_text = st.empty()
                         
-                        df_unicos = saida.drop_duplicates(subset=['Parada']).copy()
-                        total_paradas = len(df_unicos)
+                        # Pega apenas uma ocorrência de cada parada única para o mapa
+                        df_unicos_mapa = saida.drop_duplicates(subset=['Parada']).copy()
+                        total_paradas_mapa = len(df_unicos_mapa)
                         
-                        for idx, row in enumerate(df_unicos.itertuples()):
-                            # Ajuste do endereço para melhor busca no mapa
+                        for idx, row in enumerate(df_unicos_mapa.itertuples()):
                             busca = f"{row.Endereco_Completo}, Brasil"
                             try:
                                 location = geolocator.geocode(busca, timeout=10)
                                 if location:
-                                    coords.append({'lat': location.latitude, 'lon': location.longitude})
+                                    coords_validas.append({
+                                        'lat': location.latitude, 
+                                        'lon': location.longitude,
+                                        'ender': row.Endereco_Completo,
+                                        'parada': row.Parada
+                                    })
                                 else:
-                                    coords.append({'lat': None, 'lon': None})
+                                    falhas_geocoding += 1
                             except:
-                                coords.append({'lat': None, 'lon': None})
+                                falhas_geocoding += 1
                             
-                            # Respeita o limite da API (1 req/seg)
-                            progress_bar.progress((idx + 1) / total_paradas)
-                            status_text.text(f"Mapeando parada {idx + 1} de {total_paradas}...")
-                            time.sleep(1)
+                            # Atualiza progresso e respeita limite da API
+                            perc = (idx + 1) / total_paradas_mapa
+                            progress_bar.progress(perc)
+                            status_text.text(f"Mapeando parada {idx + 1}/{total_paradas_mapa}...")
+                            time.sleep(1.1) # Tempo de segurança para a API
                         
-                        df_mapa = pd.DataFrame(coords).dropna()
-                        if not df_mapa.empty:
-                            st.map(df_mapa)
-                        else:
-                            st.warning("Não foi possível carregar os pontos no mapa.")
                         status_text.empty()
+                        progress_bar.empty()
+
+                        # Gerar o mapa Folium se houver coordenadas válidas
+                        if coords_validas:
+                            # Centro do mapa (média dos pontos ou Fortaleza padrão)
+                            lat_media = sum(p['lat'] for p in coords_validas) / len(coords_validas)
+                            lon_media = sum(p['lon'] for p in coords_validas) / len(coords_validas)
+                            m = folium.Map(location=[lat_media, lon_media], zoom_start=13, tiles="cartodbpositron")
+
+                            for point in coords_validas:
+                                # Cria o ponto vermelho pequeno e clicável
+                                folium.CircleMarker(
+                                    location=[point['lat'], point['lon']],
+                                    radius=4,      # Tamanho pequeno
+                                    color='red',   # Cor da borda
+                                    fill=True,
+                                    fill_color='red', # Cor do preenchimento
+                                    fill_opacity=0.8,
+                                    popup=folium.Popup(f"Parada {point['parada']}: {point['ender']}", max_width=250)
+                                ).add_to(m)
+
+                            if falhas_geocoding > 0:
+                                st.warning(f"⚠️ Atenção: {falhas_geocoding} endereços não foram encontrados no mapa e não estão visíveis.")
+                            
+                            # Exibe o mapa no Streamlit
+                            st_folium(m, width="100%", height=500)
+                        else:
+                            st.error("Não foi possível encontrar nenhum endereço no mapa.")
 
                     # Métricas e Tabela
                     c1, c2, c3 = st.columns(3)

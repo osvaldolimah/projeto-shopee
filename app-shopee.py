@@ -4,96 +4,87 @@ import io
 
 st.set_page_config(page_title="Estrategista das Rotas Pro", page_icon="🚚", layout="wide")
 
-st.title("🚚 Estrategista das Rotas (Versão Universal)")
-st.markdown("Filtre romaneios de qualquer analista. O sistema detecta automaticamente o cabeçalho.")
+st.title("🚚 Estrategista das Rotas (Busca Global)")
+st.markdown("Filtro inteligente: eu procuro o código da sua gaiola em **todas** as células da planilha.")
 
 arquivo_upload = st.file_uploader("Selecione o arquivo Romaneio (.xlsx)", type=["xlsx"])
+gaiola_alvo = st.text_input("Digite o código da sua Gaiola (Ex: B-50, F-27, A-36)").strip().upper()
 
-def smart_load_excel(file):
-    """Função de Especialista: Localiza o cabeçalho real na planilha"""
-    xl = pd.ExcelFile(file)
-    # Tenta focar na aba que geralmente tem os dados, ou na primeira
-    sheet_name = next((s for s in xl.sheet_names if 'ROMANEIO' in s.upper() or 'DADOS' in s.upper()), xl.sheet_names[0])
-    
-    # Lê sem cabeçalho para analisar a estrutura
-    df_raw = pd.read_excel(file, sheet_name=sheet_name, header=None, engine='openpyxl')
-    
-    # Lista de palavras-chave para detectar o cabeçalho
-    keywords = ['GAIOLA', 'LETRA', 'ENDERE', 'ADDRESS', 'LOGRA', 'ROTA']
-    
-    header_row = 0
-    for i, row in df_raw.head(20).iterrows():
-        # Verifica se alguma palavra-chave está presente nesta linha
-        row_str = " ".join([str(val).upper() for val in row.values if pd.notna(val)])
-        if any(key in row_str for key in keywords):
-            header_row = i
-            break
-            
-    # Recarrega o DF a partir da linha encontrada
-    df = pd.read_excel(file, sheet_name=sheet_name, skiprows=header_row, engine='openpyxl')
-    return df, sheet_name
+def limpar(texto):
+    """Remove hífens e espaços para comparação perfeita"""
+    return str(texto).replace("-", "").replace(" ", "").upper()
 
-if arquivo_upload is not None:
+if arquivo_upload is not None and gaiola_alvo:
     try:
-        df, nome_aba = smart_load_excel(arquivo_upload)
+        # 1. Carrega todas as abas e tenta achar onde o dado está
+        xl = pd.ExcelFile(arquivo_upload)
+        sheet_name = xl.sheet_names[0] # Começamos pela primeira
+        df = pd.read_excel(arquivo_upload, sheet_name=sheet_name, header=None)
         
-        # Limpa nomes de colunas (converte para string, remove espaços e sobe para MAIÚSCULO)
-        df.columns = [str(c).strip().upper() for c in df.columns]
+        target = limpar(gaiola_alvo)
+        col_gaiola_index = None
         
-        # Mapeamento Inteligente por prioridade
-        termos_gaiola = ['GAIOLA', 'LETRA', 'LET', 'ROTA', 'POSTO', 'ZONA']
-        termos_endereco = ['ENDERE', 'LOGRA', 'ADDRESS', 'ADRESS', 'RUA', 'LOCAL']
-        termos_bairro = ['BAIRRO', 'NEIGHBOR', 'SETOR', 'LOCALIDADE']
+        # 2. BUSCA GLOBAL: Varre cada coluna para achar onde o código da gaiola aparece
+        for col in df.columns:
+            if df[col].astype(str).apply(limpar).eq(target).any():
+                col_gaiola_index = col
+                break
         
-        # Busca a melhor coluna disponível
-        col_gaiola = next((c for c in df.columns if any(t in c for t in termos_gaiola)), None)
-        col_end = next((c for c in df.columns if any(t in c for t in termos_endereco)), None)
-        col_bairro = next((c for c in df.columns if any(t in c for t in termos_bairro)), None)
-
-        if col_gaiola and col_end:
-            st.success(f"📍 Aba detectada: **{nome_aba}** | Colunas: **{col_gaiola}** e **{col_end}**")
+        if col_gaiola_index is not None:
+            # 3. Uma vez achada a coluna, vamos descobrir onde começam os dados (cabeçalho)
+            # Procuramos a primeira linha onde o alvo aparece
+            first_row_idx = df[df[col_gaiola_index].astype(str).apply(limpar) == target].index[0]
             
-            gaiola_alvo = st.text_input("Digite a Gaiola (Ex: B-50, A-36, F-27)").strip().upper()
+            # Pegamos os dados e tentamos identificar as outras colunas por palavras-chave
+            # Vamos olhar a linha acima de onde os dados começam para ver os títulos
+            headers = df.iloc[max(0, first_row_idx-1)].astype(str).str.upper().values
+            
+            termos_endereco = ['ENDERE', 'LOGRA', 'ADDRESS', 'RUA', 'LOCAL']
+            termos_bairro = ['BAIRRO', 'NEIGHBOR', 'SETOR', 'LOCALIDADE', 'DISTRICT']
+            
+            col_end_idx = None
+            col_bairro_idx = None
+            
+            for i, h in enumerate(headers):
+                if any(t in h for t in termos_endereco): col_end_idx = i
+                if any(t in h for t in termos_bairro): col_bairro_idx = i
+            
+            # Se não achou pelos nomes, tenta o "chute técnico" (Endereço costuma ser uma coluna larga)
+            if col_end_idx is None:
+                # O endereço geralmente é a coluna com texto mais longo
+                col_end_idx = col_gaiola_index + 3 if col_gaiola_index + 3 < len(df.columns) else col_gaiola_index + 1
 
-            if gaiola_alvo:
-                # Função de limpeza profunda para comparação
-                def clean(val): return str(val).replace("-", "").replace(" ", "").upper()
-                
-                target = clean(gaiola_alvo)
-                df_filtrado = df[df[col_gaiola].apply(clean) == target].copy()
+            # 4. FILTRAGEM FINAL
+            df_filtrado = df[df[col_gaiola_index].astype(str).apply(limpar) == target].copy()
+            
+            st.success(f"✅ Sucesso! Encontrei o código **{gaiola_alvo}** na coluna `{col_gaiola_index}`.")
+            
+            # Criando o arquivo de saída
+            saida = pd.DataFrame()
+            saida['Gaiola'] = df_filtrado[col_gaiola_index]
+            
+            # Tratamento de Endereço e Bairro
+            ender = df_filtrado[col_end_idx].astype(str) if col_end_idx is not None else "Endereço não identificado"
+            bairro = df_filtrado[col_bairro_idx].astype(str) + ", " if col_bairro_idx is not None else ""
+            
+            saida['Endereco_Completo'] = ender + ", " + bairro + "Fortaleza - CE"
 
-                if not df_filtrado.empty:
-                    st.info(f"Encontramos **{len(df_filtrado)}** entregas.")
-                    
-                    # Preparação para o Circuit
-                    df_filtrado = df_filtrado.fillna('')
-                    saida = pd.DataFrame()
-                    saida['Gaiola'] = df_filtrado[col_gaiola]
-                    
-                    # Montagem inteligente do endereço
-                    bairro_txt = df_filtrado[col_bairro].astype(str) + ", " if col_bairro else ""
-                    saida['Endereco_Completo'] = (
-                        df_filtrado[col_end].astype(str) + ", " + 
-                        bairro_txt + "Fortaleza - CE"
-                    )
+            st.subheader(f"📋 Rota Gerada: {gaiola_alvo}")
+            st.dataframe(saida, use_container_width=True)
 
-                    st.dataframe(saida, use_container_width=True)
-
-                    # Exportação
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        saida.to_excel(writer, index=False)
-                    
-                    st.download_button(
-                        label=f"📥 BAIXAR ROTA {gaiola_alvo}",
-                        data=output.getvalue(),
-                        file_name=f"Rota_{gaiola_alvo}.xlsx"
-                    )
-                else:
-                    st.warning(f"Gaiola '{gaiola_alvo}' não encontrada nesta planilha.")
+            # Download
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                saida.to_excel(writer, index=False)
+            
+            st.download_button(
+                label=f"📥 BAIXAR PLANILHA {gaiola_alvo}",
+                data=output.getvalue(),
+                file_name=f"Rota_{gaiola_alvo}.xlsx"
+            )
         else:
-            st.error("❌ Não consegui identificar as colunas de Gaiola ou Endereço automaticamente.")
-            st.write("Colunas encontradas:", list(df.columns))
+            st.error(f"❌ O código '{gaiola_alvo}' não foi encontrado em nenhuma célula desta planilha.")
+            st.info("Dica: Verifique se digitou o código exatamente como está no papel (ex: B-50 ou A-21).")
 
     except Exception as e:
-        st.error(f"Erro de processamento: {e}")
+        st.error(f"Erro inesperado: {e}")

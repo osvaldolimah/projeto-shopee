@@ -2,69 +2,62 @@ import streamlit as st
 import pandas as pd
 import io
 
-# Configuração da página e do título na aba do navegador
+# Configuração da página
 st.set_page_config(page_title="Filtro de Rotas para o Circuit", page_icon="🚚", layout="wide")
 
-# --- CUSTOMIZAÇÃO CSS PARA MOBILE E PORTUGUÊS ---
+# --- CUSTOMIZAÇÃO CSS ---
 st.markdown("""
     <style>
-    /* Esconde o texto original de 'Drag and Drop' e o limite de tamanho */
-    div[data-testid="stFileUploaderDropzoneInstructions"] > div > span {
-        visibility: hidden;
-    }
-    div[data-testid="stFileUploaderDropzoneInstructions"] > div > small {
-        display: none;
-    }
-    /* Insere o novo texto em Português */
+    div[data-testid="stFileUploaderDropzoneInstructions"] > div > span { visibility: hidden; }
+    div[data-testid="stFileUploaderDropzoneInstructions"] > div > small { display: none; }
     div[data-testid="stFileUploaderDropzoneInstructions"] > div > span::after {
         content: "Clique aqui para selecionar o Romaneio (.xlsx)";
         visibility: visible;
         display: block;
         margin-top: -20px;
     }
-    /* Estilização para botões grandes em dispositivos móveis (Android/Tablet) */
-    .stButton > button {
-        height: 3.5em;
-        font-weight: bold;
-        border-radius: 10px;
-        width: 100%;
-    }
+    .stButton > button { height: 3.5em; font-weight: bold; border-radius: 10px; width: 100%; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🚚 Filtro de Rotas para o Circuit")
 
-# 1. Entrada de Arquivo
 arquivo_upload = st.file_uploader("Selecione o arquivo Romaneio", type=["xlsx"])
-
-# 2. Entrada da Gaiola
 gaiola_alvo = st.text_input("Digite o código da Gaiola", placeholder="Ex: B-50").strip().upper()
-
-# 3. Botão de Execução
 botao_executar = st.button("🚀 GERAR ROTA")
 
 def limpar_string(s):
-    """Remove caracteres especiais e espaços para comparação exata"""
     return "".join(filter(str.isalnum, str(s))).upper()
 
 def extrair_base_endereco(endereco_completo):
-    """Agrupa pacotes do mesmo prédio em uma única parada (Rua + Número)"""
     partes = str(endereco_completo).split(',')
     if len(partes) >= 2:
-        # Pega Rua e Número, ignora Complemento/Apto para agrupar condomínios
         base = partes[0].strip() + " " + partes[1].strip()
     else:
         base = partes[0].strip()
     return limpar_string(base)
 
+def identificar_comercio(endereco):
+    """Analisa se o endereço possui características de estabelecimento comercial"""
+    termos_comerciais = [
+        'LOJA', 'MERCADO', 'MERCEARIA', 'FARMACIA', 'DROGARIA', 'SHOPPING', 'CLINICA', 
+        'HOSPITAL', 'POSTO', 'OFICINA', 'RESTAURANTE', 'LANCHONETE', 'PADARIA', 'PANIFICADORA',
+        'ACADEMIA', 'ESCOLA', 'COLEGIO', 'FACULDADE', 'IGREJA', 'TEMPLO', 'CONDOMINIO',
+        'EMPRESA', 'LTDA', 'MEI', 'SALA', 'SALAO', 'BARBEARIA', 'ESTACIONAMENTO', 'HOTEL'
+    ]
+    endereco_up = str(endereco).upper()
+    for termo in termos_comerciais:
+        if termo in endereco_up:
+            return "🏪 Comércio"
+    return "🏠 Residencial"
+
 if arquivo_upload is not None and gaiola_alvo and botao_executar:
-    with st.spinner('🔄 Processando dados...'):
+    with st.spinner('🔄 Analisando endereços...'):
         try:
             xl = pd.ExcelFile(arquivo_upload)
             encontrado = False
             target_limpo = limpar_string(gaiola_alvo)
 
-            # Varre as abas do Excel em busca do código da gaiola em qualquer célula
             for aba in xl.sheet_names:
                 df_raw = pd.read_excel(arquivo_upload, sheet_name=aba, header=None, engine='openpyxl')
                 
@@ -79,7 +72,6 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     mask = df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo
                     dados_filtrados = df_raw[mask].copy()
                     
-                    # Detecção automática de colunas de endereço e bairro
                     col_end_idx, col_bairro_idx = None, None
                     termos_end = ['ENDERE', 'LOGRA', 'ADDRESS', 'ADRESS', 'RUA', 'LOCAL']
                     termos_bair = ['BAIRRO', 'NEIGHBOR', 'SETOR', 'LOCALIDADE']
@@ -94,30 +86,30 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                         larguras = [len(str(x)) for x in dados_filtrados.iloc[0]]
                         col_end_idx = larguras.index(max(larguras))
 
-                    # --- LÓGICA DE PARADAS REAIS (CONDOMÍNIOS) ---
+                    # Lógica de Paradas e Identificação Comercial
                     dados_filtrados['CHAVE_STOP'] = dados_filtrados[col_end_idx].apply(extrair_base_endereco)
                     unicos = dados_filtrados['CHAVE_STOP'].unique()
                     mapa_stops = {end: i + 1 for i, end in enumerate(unicos)}
-                    dados_filtrados['NUM_PARADA'] = dados_filtrados['CHAVE_STOP'].map(mapa_stops)
-
-                    # DataFrame de Saída Formatado
+                    
                     saida = pd.DataFrame()
-                    saida['Parada'] = dados_filtrados['NUM_PARADA']
+                    saida['Parada'] = dados_filtrados['CHAVE_STOP'].map(mapa_stops)
                     saida['Gaiola'] = dados_filtrados[col_gaiola_idx]
+                    
+                    # Identificação de Comércio
+                    saida['Tipo'] = dados_filtrados[col_end_idx].apply(identificar_comercio)
                     
                     endereco_original = dados_filtrados[col_end_idx].astype(str)
                     bairro = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = endereco_original + ", " + bairro + "Fortaleza - CE"
 
-                    # Painel de Métricas Corrigido
-                    c1, c2 = st.columns(2)
+                    # Métricas de Operação
+                    c1, c2, c3 = st.columns(3)
                     c1.metric("📦 Pacotes", len(saida))
                     c2.metric("📍 Paradas Reais", len(unicos))
+                    c3.metric("🏪 Comércios", len(saida[saida['Tipo'] == "🏪 Comércio"]))
 
-                    # Tabela de Visualização
                     st.dataframe(saida, use_container_width=True)
 
-                    # Exportação para Excel em memória
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='openpyxl') as writer:
                         saida.to_excel(writer, index=False)

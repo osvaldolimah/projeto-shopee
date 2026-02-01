@@ -5,7 +5,7 @@ import io
 # Configuração da página e do título na aba do navegador
 st.set_page_config(page_title="Filtro de Rotas para o Circuit", page_icon="🚚", layout="wide")
 
-# --- CUSTOMIZAÇÃO CSS ---
+# --- CUSTOMIZAÇÃO CSS PARA MOBILE E PORTUGUÊS ---
 st.markdown("""
     <style>
     /* Esconde o texto original de 'Drag and Drop' e o limite de tamanho */
@@ -22,11 +22,12 @@ st.markdown("""
         display: block;
         margin-top: -20px;
     }
-    /* Estilização para botões grandes em dispositivos móveis */
+    /* Estilização para botões grandes em dispositivos móveis (Android/Tablet) */
     .stButton > button {
         height: 3.5em;
         font-weight: bold;
         border-radius: 10px;
+        width: 100%;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -50,7 +51,7 @@ def extrair_base_endereco(endereco_completo):
     """Agrupa pacotes do mesmo prédio em uma única parada (Rua + Número)"""
     partes = str(endereco_completo).split(',')
     if len(partes) >= 2:
-        # Pega Rua e Número, ignora Complemento/Apto
+        # Pega Rua e Número, ignora Complemento/Apto para agrupar condomínios
         base = partes[0].strip() + " " + partes[1].strip()
     else:
         base = partes[0].strip()
@@ -63,7 +64,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
             encontrado = False
             target_limpo = limpar_string(gaiola_alvo)
 
-            # Varre as abas do Excel em busca do código da gaiola
+            # Varre as abas do Excel em busca do código da gaiola em qualquer célula
             for aba in xl.sheet_names:
                 df_raw = pd.read_excel(arquivo_upload, sheet_name=aba, header=None, engine='openpyxl')
                 
@@ -78,7 +79,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     mask = df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo
                     dados_filtrados = df_raw[mask].copy()
                     
-                    # Detecção automática de colunas
+                    # Detecção automática de colunas de endereço e bairro
                     col_end_idx, col_bairro_idx = None, None
                     termos_end = ['ENDERE', 'LOGRA', 'ADDRESS', 'ADRESS', 'RUA', 'LOCAL']
                     termos_bair = ['BAIRRO', 'NEIGHBOR', 'SETOR', 'LOCALIDADE']
@@ -93,13 +94,13 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                         larguras = [len(str(x)) for x in dados_filtrados.iloc[0]]
                         col_end_idx = larguras.index(max(larguras))
 
-                    # --- LÓGICA DE PARADAS REAIS ---
+                    # --- LÓGICA DE PARADAS REAIS (CONDOMÍNIOS) ---
                     dados_filtrados['CHAVE_STOP'] = dados_filtrados[col_end_idx].apply(extrair_base_endereco)
                     unicos = dados_filtrados['CHAVE_STOP'].unique()
                     mapa_stops = {end: i + 1 for i, end in enumerate(unicos)}
                     dados_filtrados['NUM_PARADA'] = dados_filtrados['CHAVE_STOP'].map(mapa_stops)
 
-                    # DataFrame de Saída
+                    # DataFrame de Saída Formatado
                     saida = pd.DataFrame()
                     saida['Parada'] = dados_filtrados['NUM_PARADA']
                     saida['Gaiola'] = dados_filtrados[col_gaiola_idx]
@@ -108,7 +109,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = endereco_original + ", " + bairro + "Fortaleza - CE"
 
-                    # Métricas de Operação
+                    # Painel de Métricas Corrigido
                     c1, c2 = st.columns(2)
                     c1.metric("📦 Pacotes", len(saida))
                     c2.metric("📍 Paradas Reais", len(unicos))
@@ -116,7 +117,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     # Tabela de Visualização
                     st.dataframe(saida, use_container_width=True)
 
-                    # Exportação Excel
+                    # Exportação para Excel em memória
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='openpyxl') as writer:
                         saida.to_excel(writer, index=False)

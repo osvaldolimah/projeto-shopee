@@ -3,13 +3,16 @@ import pandas as pd
 import io
 import unicodedata
 import time
-# Novas importações para o mapa profissional
-from geopy.geocoders import Nominatim
-from geopy.exc import GeocoderTimedOut
-import folium
-from streamlit_folium import st_folium
 
-# Configuração da página
+# Tentativa de importar bibliotecas de mapa (se falhar, o app não quebra)
+try:
+    from geopy.geocoders import Nominatim
+    import folium
+    from streamlit_folium import st_folium
+    MAPA_DISPONIVEL = True
+except ImportError:
+    MAPA_DISPONIVEL = False
+
 st.set_page_config(page_title="Filtro de Rotas para o Circuit", page_icon="🚚", layout="wide")
 
 # --- CUSTOMIZAÇÃO CSS ---
@@ -32,12 +35,16 @@ st.title("🚚 Filtro de Rotas para o Circuit")
 arquivo_upload = st.file_uploader("Selecione o arquivo Romaneio", type=["xlsx"])
 gaiola_alvo = st.text_input("Digite o código da Gaiola", placeholder="Ex: B-50").strip().upper()
 
-# Checkbox para ativar o mapa
-visualizar_mapa = st.checkbox("📍 Gerar mapa interativo (Aprox. 1s por parada)", value=False)
+# Só mostra a opção de mapa se as bibliotecas estiverem instaladas
+if MAPA_DISPONIVEL:
+    visualizar_mapa = st.checkbox("📍 Tentar gerar mapa da rota (Pode demorar)", value=False)
+else:
+    st.warning("⚠️ Bibliotecas de mapa não instaladas. O app funcionará apenas para a planilha.")
+    visualizar_mapa = False
 
 botao_executar = st.button("🚀 GERAR ROTA")
 
-# --- FUNÇÕES AUXILIARES (Sua lógica de negócio) ---
+# --- FUNÇÕES DE LÓGICA ---
 def remover_acentos(texto):
     return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()
@@ -58,14 +65,15 @@ def identificar_comercio(endereco):
         'LOJA', 'MERCADO', 'MERCEARIA', 'FARMACIA', 'DROGARIA', 'SHOPPING', 'CLINICA', 
         'HOSPITAL', 'POSTO', 'OFICINA', 'RESTAURANTE', 'LANCHONETE', 'PADARIA', 'PANIFICADORA',
         'ACADEMIA', 'ESCOLA', 'COLEGIO', 'FACULDADE', 'IGREJA', 'TEMPLO',
-        'EMPRESA', 'LTDA', 'MEI', 'SALA', 'SALAO', 'BARBEARIA', 'ESTACIONAMENTO', 'HOTEL', 'SUPERMERCADO', 'AMC', 'ATACADO', 'DISTRIBUIDORA', 'AUTOPECAS', 'VIDRAÇARIA', 'LABORATORIO', 'CLUBE', 'ASSOCIACAO', 'BOUTIQUE', 'MERCANTIL',
-        'DEPARTAMENTO', 'VARIEDADES', 'PIZZARIA', 'CHURRASCARIA', 'CARNES', 'PEIXARIA', 'FRUTARIA', 'HORTIFRUTI', 'FLORICULTURA'
+        'EMPRESA', 'LTDA', 'MEI', 'SALA', 'SALAO', 'BARBEARIA', 'ESTACIONAMENTO', 'HOTEL', 
+        'SUPERMERCADO', 'AMC', 'ATACADO', 'DISTRIBUIDORA', 'AUTOPECAS', 'VIDRAÇARIA', 
+        'LABORATORIO', 'CLUBE', 'ASSOCIACAO', 'BOUTIQUE', 'MERCANTIL',
+        'DEPARTAMENTO', 'VARIEDADES', 'PIZZARIA', 'CHURRASCARIA', 'CARNES', 'PEIXARIA', 
+        'FRUTARIA', 'HORTIFRUTI', 'FLORICULTURA'
     ]
     termos_anuladores = ['FRENTE', 'LADO', 'PROXIMO', 'VIZINHO', 'DEFRONTE', 'ATRAS', 'DEPOIS', 'PERTO', 'VIZINHA']
-    
     end_limpo = remover_acentos(endereco)
     partes = end_limpo.split(',')
-    
     for parte in partes:
         palavras = parte.split()
         for i, palavra in enumerate(palavras):
@@ -78,9 +86,8 @@ def identificar_comercio(endereco):
                     return "🏪 Comércio"
     return "🏠 Residencial"
 
-# --- PROCESSAMENTO PRINCIPAL ---
 if arquivo_upload is not None and gaiola_alvo and botao_executar:
-    with st.spinner('🔄 Processando dados...'):
+    with st.spinner('🔄 Filtrando romaneio...'):
         try:
             xl = pd.ExcelFile(arquivo_upload)
             encontrado = False
@@ -99,7 +106,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     mask = df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo
                     dados_filtrados = df_raw[mask].copy()
                     
-                    # Identificação de colunas
+                    # Detecção de colunas
                     col_end_idx, col_bairro_idx = None, None
                     termos_end = ['ENDERE', 'LOGRA', 'ADDRESS', 'ADRESS', 'RUA', 'LOCAL']
                     termos_bair = ['BAIRRO', 'NEIGHBOR', 'SETOR', 'LOCALIDADE']
@@ -108,11 +115,12 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                         for i, val in enumerate(linha_cabecalho):
                             if any(t in val for t in termos_end): col_end_idx = i
                             if any(t in val for t in termos_bair): col_bairro_idx = i
+                    
                     if col_end_idx is None:
                         larguras = [len(str(x)) for x in dados_filtrados.iloc[0]]
                         col_end_idx = larguras.index(max(larguras))
 
-                    # Processamento dos dados
+                    # Lógica de Paradas e Tabela
                     dados_filtrados['CHAVE_STOP'] = dados_filtrados[col_end_idx].apply(extrair_base_endereco)
                     unicos = dados_filtrados['CHAVE_STOP'].unique()
                     mapa_stops = {end: i + 1 for i, end in enumerate(unicos)}
@@ -126,74 +134,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro_raw = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = endereco_original + ", " + bairro_raw + "Fortaleza - CE"
 
-                    # --- LÓGICA DO MAPA PROFISSIONAL (FOLIUM) ---
-                    if visualizar_mapa:
-                        st.subheader("📍 Visualização da Rota")
-                        geolocator = Nominatim(user_agent="estratega_rotas_pro_v2")
-                        coords_validas = []
-                        falhas_geocoding = 0
-                        
-                        # Prepara a barra de progresso
-                        progress_bar = st.progress(0)
-                        status_text = st.empty()
-                        
-                        # Pega apenas uma ocorrência de cada parada única para o mapa
-                        df_unicos_mapa = saida.drop_duplicates(subset=['Parada']).copy()
-                        total_paradas_mapa = len(df_unicos_mapa)
-                        
-                        for idx, row in enumerate(df_unicos_mapa.itertuples()):
-                            busca = f"{row.Endereco_Completo}, Brasil"
-                            try:
-                                location = geolocator.geocode(busca, timeout=10)
-                                if location:
-                                    coords_validas.append({
-                                        'lat': location.latitude, 
-                                        'lon': location.longitude,
-                                        'ender': row.Endereco_Completo,
-                                        'parada': row.Parada
-                                    })
-                                else:
-                                    falhas_geocoding += 1
-                            except:
-                                falhas_geocoding += 1
-                            
-                            # Atualiza progresso e respeita limite da API
-                            perc = (idx + 1) / total_paradas_mapa
-                            progress_bar.progress(perc)
-                            status_text.text(f"Mapeando parada {idx + 1}/{total_paradas_mapa}...")
-                            time.sleep(1.1) # Tempo de segurança para a API
-                        
-                        status_text.empty()
-                        progress_bar.empty()
-
-                        # Gerar o mapa Folium se houver coordenadas válidas
-                        if coords_validas:
-                            # Centro do mapa (média dos pontos ou Fortaleza padrão)
-                            lat_media = sum(p['lat'] for p in coords_validas) / len(coords_validas)
-                            lon_media = sum(p['lon'] for p in coords_validas) / len(coords_validas)
-                            m = folium.Map(location=[lat_media, lon_media], zoom_start=13, tiles="cartodbpositron")
-
-                            for point in coords_validas:
-                                # Cria o ponto vermelho pequeno e clicável
-                                folium.CircleMarker(
-                                    location=[point['lat'], point['lon']],
-                                    radius=4,      # Tamanho pequeno
-                                    color='red',   # Cor da borda
-                                    fill=True,
-                                    fill_color='red', # Cor do preenchimento
-                                    fill_opacity=0.8,
-                                    popup=folium.Popup(f"Parada {point['parada']}: {point['ender']}", max_width=250)
-                                ).add_to(m)
-
-                            if falhas_geocoding > 0:
-                                st.warning(f"⚠️ Atenção: {falhas_geocoding} endereços não foram encontrados no mapa e não estão visíveis.")
-                            
-                            # Exibe o mapa no Streamlit
-                            st_folium(m, width="100%", height=500)
-                        else:
-                            st.error("Não foi possível encontrar nenhum endereço no mapa.")
-
-                    # Métricas e Tabela
+                    # --- EXIBIÇÃO PRIORITÁRIA (ISSO SEMPRE VAI APARECER) ---
                     c1, c2, c3 = st.columns(3)
                     c1.metric("📦 Pacotes", len(saida))
                     c2.metric("📍 Paradas Reais", len(unicos))
@@ -206,15 +147,53 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                         saida.to_excel(writer, index=False)
                     
                     st.download_button(
-                        label=f"📥 BAIXAR ROTA ({len(unicos)} PARADAS)",
+                        label=f"📥 BAIXAR PLANILHA PARA O CIRCUIT",
                         data=output.getvalue(),
                         file_name=f"Rota_{gaiola_alvo}.xlsx",
                         use_container_width=True
                     )
+
+                    # --- MAPA (COMO ACESSÓRIO PROTEGIDO) ---
+                    if visualizar_mapa and MAPA_DISPONIVEL:
+                        try:
+                            st.divider()
+                            st.subheader("📍 Mapa Prévio da Rota")
+                            geolocator = Nominatim(user_agent="rota_shopee_fortaleza")
+                            coords_validas = []
+                            
+                            pbar = st.progress(0)
+                            status = st.empty()
+                            
+                            df_mapa_u = saida.drop_duplicates(subset=['Parada'])
+                            total = len(df_mapa_u)
+
+                            for i, r_mapa in enumerate(df_mapa_u.itertuples()):
+                                try:
+                                    loc = geolocator.geocode(f"{r_mapa.Endereco_Completo}, Brasil", timeout=5)
+                                    if loc:
+                                        coords_validas.append([loc.latitude, loc.longitude, r_mapa.Endereco_Completo])
+                                except: pass
+                                pbar.progress((i+1)/total)
+                                status.text(f"Geolocalizando {i+1}/{total}...")
+                                time.sleep(1.1)
+                            
+                            status.empty()
+                            pbar.empty()
+
+                            if coords_validas:
+                                m = folium.Map(location=[coords_validas[0][0], coords_validas[0][1]], zoom_start=12)
+                                for c in coords_validas:
+                                    folium.CircleMarker(location=[c[0], c[1]], radius=3, color='red', fill=True).add_to(m)
+                                st_folium(m, width=700, height=400)
+                            else:
+                                st.info("Não foi possível gerar pontos no mapa com esses endereços.")
+                        except Exception as e:
+                            st.error(f"Ocorreu um erro ao gerar o mapa: {e}")
+
                     break 
 
             if not encontrado:
                 st.error(f"❌ Código '{gaiola_alvo}' não encontrado.")
 
         except Exception as e:
-            st.error(f"Erro no processamento: {e}")
+            st.error(f"Erro fatal: {e}")

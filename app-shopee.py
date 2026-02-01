@@ -28,16 +28,16 @@ gaiola_alvo = st.text_input("Digite o código da Gaiola", placeholder="Ex: B-50"
 botao_executar = st.button("🚀 GERAR ROTA")
 
 def remover_acentos(texto):
-    """Remove acentos de uma string (Ex: 'Clínica' vira 'Clinica')"""
-    return "".join(c for c in unicodedata.normalize('NFD', texto)
+    """Transforma 'Clínica' em 'CLINICA' para evitar erros de detecção"""
+    return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()
 
 def limpar_string(s):
-    """Remove caracteres especiais e espaços para códigos de gaiola"""
+    """Limpeza para códigos de gaiola"""
     return "".join(filter(str.isalnum, str(s))).upper()
 
 def extrair_base_endereco(endereco_completo):
-    """Agrupa por Rua + Número para identificar condomínios"""
+    """Agrupa por Rua + Número para identificar paradas únicas"""
     partes = str(endereco_completo).split(',')
     if len(partes) >= 2:
         base = partes[0].strip() + " " + partes[1].strip()
@@ -46,11 +46,17 @@ def extrair_base_endereco(endereco_completo):
     return limpar_string(base)
 
 def identificar_comercio(endereco):
-    """Detector que ignora acentos e entende o contexto (referências)"""
+    """
+    Detector de Comércio Refinado:
+    1. Ignora acentos.
+    2. Ignora Condomínios (considerados residenciais).
+    3. Verifica contexto negativo (ex: 'Perto da loja').
+    """
+    # Lista atualizada: CONDOMINIO removido para ser considerado Residencial
     termos_comerciais = [
         'LOJA', 'MERCADO', 'MERCEARIA', 'FARMACIA', 'DROGARIA', 'SHOPPING', 'CLINICA', 
         'HOSPITAL', 'POSTO', 'OFICINA', 'RESTAURANTE', 'LANCHONETE', 'PADARIA', 'PANIFICADORA',
-        'ACADEMIA', 'ESCOLA', 'COLEGIO', 'FACULDADE', 'IGREJA', 'TEMPLO', 'CONDOMINIO',
+        'ACADEMIA', 'ESCOLA', 'COLEGIO', 'FACULDADE', 'IGREJA', 'TEMPLO',
         'EMPRESA', 'LTDA', 'MEI', 'SALA', 'SALAO', 'BARBEARIA', 'ESTACIONAMENTO', 'HOTEL'
     ]
     
@@ -58,19 +64,18 @@ def identificar_comercio(endereco):
         'FRENTE', 'LADO', 'PROXIMO', 'VIZINHO', 'DEFRONTE', 'ATRAS', 'DEPOIS', 'PERTO', 'VIZINHA'
     ]
     
-    # Remove acentos de todo o endereço antes de analisar
-    endereco_limpo = remover_acentos(str(endereco))
-    partes = endereco_limpo.split(',')
+    end_limpo = remover_acentos(endereco)
+    partes = end_limpo.split(',')
     
     for parte in partes:
         palavras = parte.split()
         for i, palavra in enumerate(palavras):
-            # Limpa pontuações
             p_limpa = "".join(filter(str.isalnum, palavra))
             
             if any(termo == p_limpa for termo in termos_comerciais):
+                # Verifica se há um 'anulador' antes da palavra nesta parte do endereço
                 contexto_anterior = " ".join(palavras[:i])
-                if any(anuladore in contexto_anterior for anuladore in termos_anuladores):
+                if any(anul in contexto_anterior for anul in termos_anuladores):
                     continue 
                 else:
                     return "🏪 Comércio"
@@ -111,7 +116,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                         larguras = [len(str(x)) for x in dados_filtrados.iloc[0]]
                         col_end_idx = larguras.index(max(larguras))
 
-                    # Processamento Final
+                    # Processamento
                     dados_filtrados['CHAVE_STOP'] = dados_filtrados[col_end_idx].apply(extrair_base_endereco)
                     unicos = dados_filtrados['CHAVE_STOP'].unique()
                     mapa_stops = {end: i + 1 for i, end in enumerate(unicos)}
@@ -125,6 +130,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = endereco_original + ", " + bairro + "Fortaleza - CE"
 
+                    # Métricas
                     c1, c2, c3 = st.columns(3)
                     c1.metric("📦 Pacotes", len(saida))
                     c2.metric("📍 Paradas Reais", len(unicos))

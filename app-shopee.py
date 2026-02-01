@@ -27,9 +27,11 @@ gaiola_alvo = st.text_input("Digite o código da Gaiola", placeholder="Ex: B-50"
 botao_executar = st.button("🚀 GERAR ROTA")
 
 def limpar_string(s):
+    """Remove caracteres especiais para comparação de códigos"""
     return "".join(filter(str.isalnum, str(s))).upper()
 
 def extrair_base_endereco(endereco_completo):
+    """Agrupa por Rua + Número para identificar condomínios"""
     partes = str(endereco_completo).split(',')
     if len(partes) >= 2:
         base = partes[0].strip() + " " + partes[1].strip()
@@ -38,21 +40,44 @@ def extrair_base_endereco(endereco_completo):
     return limpar_string(base)
 
 def identificar_comercio(endereco):
-    """Analisa se o endereço possui características de estabelecimento comercial"""
+    """
+    Detector Inteligente: Só marca como comércio se a palavra-chave 
+    não estiver acompanhada de um termo de vizinhança/referência.
+    """
     termos_comerciais = [
         'LOJA', 'MERCADO', 'MERCEARIA', 'FARMACIA', 'DROGARIA', 'SHOPPING', 'CLINICA', 
         'HOSPITAL', 'POSTO', 'OFICINA', 'RESTAURANTE', 'LANCHONETE', 'PADARIA', 'PANIFICADORA',
         'ACADEMIA', 'ESCOLA', 'COLEGIO', 'FACULDADE', 'IGREJA', 'TEMPLO', 'CONDOMINIO',
         'EMPRESA', 'LTDA', 'MEI', 'SALA', 'SALAO', 'BARBEARIA', 'ESTACIONAMENTO', 'HOTEL'
     ]
+    
+    # Termos que anulam a classificação de comércio (indicam ponto de referência)
+    termos_anuladores = [
+        'FRENTE', 'LADO', 'PROXIMO', 'VIZINHO', 'DEFRONTE', 'ATRAS', 'DEPOIS', 'PERTO', 'VIZINHA'
+    ]
+    
     endereco_up = str(endereco).upper()
-    for termo in termos_comerciais:
-        if termo in endereco_up:
-            return "🏪 Comércio"
+    palavras = endereco_up.split()
+    
+    for i, palavra in enumerate(palavras):
+        # Limpa pontuação da palavra atual (ex: "LOJA," -> "LOJA")
+        palavra_limpa = "".join(filter(str.isalnum, palavra))
+        
+        if any(termo in palavra_limpa for termo in termos_comerciais):
+            # Se achou um termo comercial, analisa as 2 palavras anteriores (o contexto)
+            inicio_contexto = max(0, i-2)
+            contexto = " ".join(palavras[inicio_contexto:i])
+            
+            # Se houver um anulador no contexto antes da palavra, ignoramos como comércio
+            if any(anuladore in contexto for anuladore in termos_anuladores):
+                continue # Continua buscando, pode haver outro termo comercial real na frase
+            else:
+                return "🏪 Comércio"
+                
     return "🏠 Residencial"
 
 if arquivo_upload is not None and gaiola_alvo and botao_executar:
-    with st.spinner('🔄 Analisando endereços...'):
+    with st.spinner('🔄 Analisando endereços com lógica de contexto...'):
         try:
             xl = pd.ExcelFile(arquivo_upload)
             encontrado = False
@@ -72,6 +97,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     mask = df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo
                     dados_filtrados = df_raw[mask].copy()
                     
+                    # Detecção de colunas
                     col_end_idx, col_bairro_idx = None, None
                     termos_end = ['ENDERE', 'LOGRA', 'ADDRESS', 'ADRESS', 'RUA', 'LOCAL']
                     termos_bair = ['BAIRRO', 'NEIGHBOR', 'SETOR', 'LOCALIDADE']
@@ -86,7 +112,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                         larguras = [len(str(x)) for x in dados_filtrados.iloc[0]]
                         col_end_idx = larguras.index(max(larguras))
 
-                    # Lógica de Paradas e Identificação Comercial
+                    # Agrupamento de Paradas e Classificação
                     dados_filtrados['CHAVE_STOP'] = dados_filtrados[col_end_idx].apply(extrair_base_endereco)
                     unicos = dados_filtrados['CHAVE_STOP'].unique()
                     mapa_stops = {end: i + 1 for i, end in enumerate(unicos)}
@@ -94,15 +120,13 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     saida = pd.DataFrame()
                     saida['Parada'] = dados_filtrados['CHAVE_STOP'].map(mapa_stops)
                     saida['Gaiola'] = dados_filtrados[col_gaiola_idx]
-                    
-                    # Identificação de Comércio
                     saida['Tipo'] = dados_filtrados[col_end_idx].apply(identificar_comercio)
                     
                     endereco_original = dados_filtrados[col_end_idx].astype(str)
                     bairro = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = endereco_original + ", " + bairro + "Fortaleza - CE"
 
-                    # Métricas de Operação
+                    # Métricas
                     c1, c2, c3 = st.columns(3)
                     c1.metric("📦 Pacotes", len(saida))
                     c2.metric("📍 Paradas Reais", len(unicos))

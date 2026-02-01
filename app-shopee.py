@@ -78,7 +78,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                         label="📥 BAIXAR AGORA",
                         data=output.getvalue(),
                         file_name=f"Rota_{gaiola_alvo}.xlsx",
-                        use_container_width=True # Botão grande para clicar com o polegar.
+                        use_container_width=True # Botão grande para clicar com o polegar
                     )
                     break 
 

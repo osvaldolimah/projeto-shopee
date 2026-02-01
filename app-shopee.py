@@ -3,7 +3,7 @@ import pandas as pd
 import io
 import unicodedata
 
-# Configuração da página para um visual profissional
+# Configuração da página
 st.set_page_config(
     page_title="Shopee - Filtro de Rotas", 
     page_icon="🚚", 
@@ -14,30 +14,41 @@ st.set_page_config(
 # --- SISTEMA DE DESIGN (CSS CUSTOMIZADO) ---
 st.markdown("""
     <style>
-    /* Cores Globais Shopee */
     :root {
         --shopee-orange: #EE4D2D;
         --shopee-white: #FFFFFF;
         --shopee-gray: #F5F5F5;
     }
 
-    /* Fundo do App */
-    .stApp {
-        background-color: var(--shopee-gray);
-    }
+    .stApp { background-color: var(--shopee-gray); }
 
-    /* Estilização do Título Principal */
     .main-title {
         color: var(--shopee-orange);
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         font-weight: 800;
         text-align: center;
-        padding-bottom: 20px;
-        border-bottom: 3px solid var(--shopee-orange);
-        margin-bottom: 30px;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
     }
 
-    /* Botão Principal Shopee Style */
+    /* Card de Tutorial */
+    .tutorial-card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 15px;
+        border: 1px solid #ddd;
+        margin-bottom: 25px;
+    }
+    
+    .step-number {
+        background-color: var(--shopee-orange);
+        color: white;
+        border-radius: 50%;
+        padding: 2px 10px;
+        font-weight: bold;
+        margin-right: 10px;
+    }
+
+    /* Botão Principal */
     div.stButton > button:first-child {
         background-color: var(--shopee-orange);
         color: white;
@@ -45,61 +56,61 @@ st.markdown("""
         padding: 15px 30px;
         font-size: 20px;
         font-weight: bold;
-        border-radius: 8px;
+        border-radius: 10px;
         width: 100%;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 10px rgba(238, 77, 45, 0.3);
     }
-    div.stButton > button:hover {
-        background-color: #d73211;
-        transform: translateY(-2px);
-    }
-
-    /* Estilização dos Metric Cards */
-    div[data-testid="metric-container"] {
-        background-color: white;
-        padding: 15px;
-        border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border-left: 5px solid var(--shopee-orange);
-    }
-
-    /* Ajuste do File Uploader (Tradução e Visual) */
+    
+    /* Tradução do File Uploader */
     div[data-testid="stFileUploaderDropzoneInstructions"] > div > span { visibility: hidden; }
     div[data-testid="stFileUploaderDropzoneInstructions"] > div > small { display: none; }
     div[data-testid="stFileUploaderDropzoneInstructions"] > div > span::after {
-        content: "📥 Selecione ou arraste o Romaneio aqui (.xlsx)";
+        content: "📥 Arraste o Romaneio (.xlsx) aqui";
         visibility: visible;
         display: block;
         color: var(--shopee-orange);
         font-weight: bold;
     }
-
-    /* Inputs arredondados */
-    .stTextInput > div > div > input {
-        border-radius: 8px;
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# Cabeçalho com Estilo
-st.markdown('<h1 class="main-title">🚚 Filtro de Rotas para o Circuit</h1>', unsafe_allow_html=True)
+# --- CABEÇALHO ---
+st.markdown('<h1 class="main-title">🚚 Shopee - Estrategista de Rotas</h1>', unsafe_allow_html=True)
 
-# Layout em Colunas para Input
-col_input1, col_input2 = st.columns([2, 1])
+# --- TUTORIAL DE USO ---
+with st.container():
+    st.markdown("""
+    <div class="tutorial-card">
+        <h3 style='color: #333; margin-top: 0;'>📖 Como usar o App:</h3>
+        <div style='display: flex; justify-content: space-around; flex-wrap: wrap;'>
+            <div style='flex: 1; min-width: 200px; padding: 10px;'>
+                <span class="step-number">1</span> <b>Carregue</b> o arquivo Excel do romaneio oficial.
+            </div>
+            <div style='flex: 1; min-width: 200px; padding: 10px;'>
+                <span class="step-number">2</span> <b>Digite</b> o código da gaiola (ex: B-50) para filtrar.
+            </div>
+            <div style='flex: 1; min-width: 200px; padding: 10px;'>
+                <span class="step-number">3</span> <b>Baixe</b> a planilha limpa e importe no seu app <b>Circuit</b>.
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-with col_input1:
-    st.markdown("### 📄 1. Carregar Arquivo")
-    arquivo_upload = st.file_uploader("", type=["xlsx"], help="Selecione o arquivo Excel enviado pelos analistas")
+# --- ÁREA DE ENTRADA ---
+col1, col2 = st.columns([2, 1])
 
-with col_input2:
-    st.markdown("### 📦 2. Identificação")
-    gaiola_alvo = st.text_input("Código da Gaiola", placeholder="Ex: B-50").strip().upper()
+with col1:
+    st.markdown("#### 📄 Carregar Romaneio")
+    arquivo_upload = st.file_uploader("", type=["xlsx"])
 
-st.markdown("---")
-botao_executar = st.button("🚀 GERAR ROTA AGORA")
+with col2:
+    st.markdown("#### 📦 Código da Gaiola")
+    gaiola_alvo = st.text_input("", placeholder="Ex: A-12").strip().upper()
 
-# --- FUNÇÕES DE LÓGICA (Mantidas do Ground Zero) ---
+st.markdown("<br>", unsafe_allow_html=True)
+botao_executar = st.button("🚀 GERAR ROTA PARA O CIRCUIT")
+
+# --- LÓGICA DE NEGÓCIO (GROUND ZERO) ---
 def remover_acentos(texto):
     return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()
@@ -143,7 +154,7 @@ def identificar_comercio(endereco):
 
 # --- PROCESSAMENTO ---
 if arquivo_upload is not None and gaiola_alvo and botao_executar:
-    with st.spinner('⚙️ Organizando sua carga...'):
+    with st.spinner('⚙️ Organizando paradas...'):
         try:
             xl = pd.ExcelFile(arquivo_upload)
             encontrado = False
@@ -176,7 +187,6 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                         larguras = [len(str(x)) for x in dados_filtrados.iloc[0]]
                         col_end_idx = larguras.index(max(larguras))
 
-                    # Processamento
                     dados_filtrados['CHAVE_STOP'] = dados_filtrados[col_end_idx].apply(extrair_base_endereco)
                     unicos = dados_filtrados['CHAVE_STOP'].unique()
                     mapa_stops = {end: i + 1 for i, end in enumerate(unicos)}
@@ -190,25 +200,21 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = endereco_original + ", " + bairro + "Fortaleza - CE"
 
-                    # --- DASHBOARD DE RESULTADOS ---
-                    st.success(f"✅ Sucesso! Gaiola {gaiola_alvo} processada.")
-                    
+                    # MÉTRICAS DASHBOARD
+                    st.markdown("---")
                     m1, m2, m3 = st.columns(3)
-                    m1.metric("📦 Total de Pacotes", len(saida))
+                    m1.metric("📦 Pacotes", len(saida))
                     m2.metric("📍 Paradas Reais", len(unicos))
-                    m3.metric("🏪 Comércios Identificados", len(saida[saida['Tipo'] == "🏪 Comércio"]))
+                    m3.metric("🏪 Comércios", len(saida[saida['Tipo'] == "🏪 Comércio"]))
 
-                    # Tabela com visual limpo
-                    st.markdown("### 📊 Prévia da Rota")
-                    st.dataframe(saida.style.highlight_max(axis=0, subset=['Tipo'], color='#fff0ed'), use_container_width=True)
+                    st.dataframe(saida, use_container_width=True)
 
-                    # Botão de Download em Destaque
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='openpyxl') as writer:
                         saida.to_excel(writer, index=False)
                     
                     st.download_button(
-                        label=f"📥 BAIXAR ROTA PARA O CIRCUIT ({len(unicos)} PARADAS)",
+                        label=f"📥 BAIXAR ROTA ({len(unicos)} PARADAS)",
                         data=output.getvalue(),
                         file_name=f"Rota_{gaiola_alvo}.xlsx",
                         use_container_width=True
@@ -216,7 +222,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     break
 
             if not encontrado:
-                st.error(f"❌ Erro: O código da gaiola '{gaiola_alvo}' não foi encontrado no arquivo.")
+                st.error(f"❌ Gaiola '{gaiola_alvo}' não encontrada no arquivo.")
 
         except Exception as e:
-            st.error(f"⚠️ Ocorreu um problema técnico: {e}")
+            st.error(f"⚠️ Erro ao processar: {e}")

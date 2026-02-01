@@ -75,7 +75,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CABEÇALHO ---
-st.markdown('<h1 class="main-title">🚚 Shopee - Estrategista de Rotas</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">🚚 Filtro de Rotas</h1>', unsafe_allow_html=True)
 
 # --- TUTORIAL DE USO ---
 with st.container():

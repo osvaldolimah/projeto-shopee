@@ -116,4 +116,66 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                 
                 if col_gaiola_idx is not None:
                     encontrado = True
-                    mask = df_raw[col_gaiola_idx].astype(str).
+                    mask = df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo
+                    dados_filtrados = df_raw[mask].copy()
+                    
+                    # Identificação automática de colunas
+                    col_end_idx, col_bairro_idx = None, None
+                    termos_end = ['ENDERE', 'LOGRA', 'ADDRESS', 'ADRESS', 'RUA', 'LOCAL']
+                    termos_bair = ['BAIRRO', 'NEIGHBOR', 'SETOR', 'LOCALIDADE']
+
+                    for r in range(min(15, len(df_raw))):
+                        linha_cabecalho = [str(x).upper() for x in df_raw.iloc[r].values]
+                        for i, val in enumerate(linha_cabecalho):
+                            if any(t in val for t in termos_end): col_end_idx = i
+                            if any(t in val for t in termos_bair): col_bairro_idx = i
+                    
+                    if col_end_idx is None:
+                        larguras = [len(str(x)) for x in dados_filtrados.iloc[0]]
+                        col_end_idx = larguras.index(max(larguras))
+
+                    # --- PROCESSAMENTO ---
+                    # 1. Agrupamento de Condomínios (Paradas Reais)
+                    dados_filtrados['CHAVE_STOP'] = dados_filtrados[col_end_idx].apply(extrair_base_endereco)
+                    unicos = dados_filtrados['CHAVE_STOP'].unique()
+                    mapa_stops = {end: i + 1 for i, end in enumerate(unicos)}
+                    
+                    # 2. Criação do DataFrame final
+                    saida = pd.DataFrame()
+                    saida['Parada'] = dados_filtrados['CHAVE_STOP'].map(mapa_stops)
+                    saida['Gaiola'] = dados_filtrados[col_gaiola_idx]
+                    
+                    # 3. Classificação Comercial com a nova lógica
+                    saida['Tipo'] = dados_filtrados[col_end_idx].apply(identificar_comercio)
+                    
+                    endereco_original = dados_filtrados[col_end_idx].astype(str)
+                    bairro = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
+                    saida['Endereco_Completo'] = endereco_original + ", " + bairro + "Fortaleza - CE"
+
+                    # Painel de Métricas
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("📦 Pacotes", len(saida))
+                    c2.metric("📍 Paradas Reais", len(unicos))
+                    c3.metric("🏪 Comércios", len(saida[saida['Tipo'] == "🏪 Comércio"]))
+
+                    # Exibição dos dados
+                    st.dataframe(saida, use_container_width=True)
+
+                    # Gerador de arquivo para download
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        saida.to_excel(writer, index=False)
+                    
+                    st.download_button(
+                        label=f"📥 BAIXAR PLANILHA ({len(unicos)} PARADAS)",
+                        data=output.getvalue(),
+                        file_name=f"Rota_{gaiola_alvo}.xlsx",
+                        use_container_width=True
+                    )
+                    break 
+
+            if not encontrado:
+                st.error(f"❌ Código '{gaiola_alvo}' não encontrado.")
+
+        except Exception as e:
+            st.error(f"Erro no processamento: {e}")

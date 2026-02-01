@@ -3,8 +3,9 @@ import pandas as pd
 import io
 import unicodedata
 import time
+import re
 
-# Tentativa de importar bibliotecas de mapa
+# Bibliotecas de mapa
 try:
     from geopy.geocoders import Nominatim
     import folium
@@ -32,13 +33,9 @@ st.markdown("""
 
 st.title("🚚 Filtro de Rotas para o Circuit")
 
-# --- INICIALIZAÇÃO DA MEMÓRIA DO APP (SESSION STATE) ---
 if 'dados_rota' not in st.session_state:
     st.session_state.dados_rota = None
-if 'gaiola_atual' not in st.session_state:
-    st.session_state.gaiola_atual = ""
 
-# --- INPUTS ---
 arquivo_upload = st.file_uploader("Selecione o arquivo Romaneio", type=["xlsx"])
 gaiola_alvo = st.text_input("Digite o código da Gaiola", placeholder="Ex: B-50").strip().upper()
 
@@ -46,9 +43,9 @@ col_btn1, col_btn2 = st.columns([1, 1])
 with col_btn1:
     botao_gerar = st.button("🚀 1. GERAR PLANILHA")
 with col_btn2:
-    visualizar_mapa = st.checkbox("📍 2. MOSTRAR MAPA (Leva tempo)", value=False)
+    visualizar_mapa = st.checkbox("📍 2. MOSTRAR MAPA (Busca precisa por Bairro)", value=False)
 
-# --- FUNÇÕES DE LÓGICA (Sua Base Ground Zero) ---
+# --- FUNÇÕES DE APOIO ---
 def remover_acentos(texto):
     return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()
@@ -64,13 +61,24 @@ def extrair_base_endereco(endereco_completo):
         base = partes[0].strip()
     return limpar_string(base)
 
+def limpar_para_gps(endereco_cru, bairro_cru):
+    """Monta uma string limpa: Rua, Numero - Bairro, Fortaleza - CE"""
+    # Pega apenas Rua e Número (antes da 2ª vírgula)
+    partes = str(endereco_cru).split(',')
+    rua_num = ", ".join(partes[:2]) if len(partes) >= 2 else partes[0]
+    bairro = str(bairro_cru).strip()
+    return f"{rua_num} - {bairro}, Fortaleza - CE"
+
 def identificar_comercio(endereco):
     termos_comerciais = [
         'LOJA', 'MERCADO', 'MERCEARIA', 'FARMACIA', 'DROGARIA', 'SHOPPING', 'CLINICA', 
         'HOSPITAL', 'POSTO', 'OFICINA', 'RESTAURANTE', 'LANCHONETE', 'PADARIA', 'PANIFICADORA',
         'ACADEMIA', 'ESCOLA', 'COLEGIO', 'FACULDADE', 'IGREJA', 'TEMPLO',
-        'EMPRESA', 'LTDA', 'MEI', 'SALA', 'SALAO', 'BARBEARIA', 'ESTACIONAMENTO', 'HOTEL', 'SUPERMERCADO', 'AMC', 'ATACADO', 'DISTRIBUIDORA', 'AUTOPECAS', 'VIDRAÇARIA', 'LABORATORIO', 'CLUBE', 'ASSOCIACAO', 'BOUTIQUE', 'MERCANTIL',
-        'DEPARTAMENTO', 'VARIEDADES', 'PIZZARIA', 'CHURRASCARIA', 'CARNES', 'PEIXARIA', 'FRUTARIA', 'HORTIFRUTI', 'FLORICULTURA'
+        'EMPRESA', 'LTDA', 'MEI', 'SALA', 'SALAO', 'BARBEARIA', 'ESTACIONAMENTO', 'HOTEL', 
+        'SUPERMERCADO', 'AMC', 'ATACADO', 'DISTRIBUIDORA', 'AUTOPECAS', 'VIDRAÇARIA', 
+        'LABORATORIO', 'CLUBE', 'ASSOCIACAO', 'BOUTIQUE', 'MERCANTIL',
+        'DEPARTAMENTO', 'VARIEDADES', 'PIZZARIA', 'CHURRASCARIA', 'CARNES', 'PEIXARIA', 
+        'FRUTARIA', 'HORTIFRUTI', 'FLORICULTURA'
     ]
     termos_anuladores = ['FRENTE', 'LADO', 'PROXIMO', 'VIZINHO', 'DEFRONTE', 'ATRAS', 'DEPOIS', 'PERTO', 'VIZINHA']
     end_limpo = remover_acentos(endereco)
@@ -89,7 +97,6 @@ def identificar_comercio(endereco):
 
 # --- PROCESSO 1: FILTRAGEM ---
 if arquivo_upload is not None and gaiola_alvo and (botao_gerar or st.session_state.dados_rota is not None):
-    # Só processa o Excel se for um novo clique ou se não houver dados salvos
     if botao_gerar:
         with st.spinner('🔄 Filtrando romaneio...'):
             try:
@@ -132,89 +139,90 @@ if arquivo_upload is not None and gaiola_alvo and (botao_gerar or st.session_sta
                         saida['Gaiola'] = dados_filtrados[col_gaiola_idx]
                         saida['Tipo'] = dados_filtrados[col_end_idx].apply(identificar_comercio)
                         
-                        endereco_original = dados_filtrados[col_end_idx].astype(str)
-                        bairro_raw = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
-                        saida['Endereco_Completo'] = endereco_original + ", " + bairro_raw + "Fortaleza - CE"
+                        # Guardamos o bairro original e o endereço original
+                        bairro_col = dados_filtrados[col_bairro_idx].astype(str) if col_bairro_idx is not None else "Fortaleza"
+                        endereco_col = dados_filtrados[col_end_idx].astype(str)
                         
-                        # SALVA NA MEMÓRIA
+                        saida['Endereco_Completo'] = endereco_col + ", " + bairro_col + ", Fortaleza - CE"
+                        # Nova coluna específica para a busca no GPS
+                        saida['Busca_GPS'] = [limpar_para_gps(e, b) for e, b in zip(endereco_col, bairro_col)]
+                        
                         st.session_state.dados_rota = saida
                         st.session_state.gaiola_atual = gaiola_alvo
                         break 
                 
                 if not encontrado:
                     st.error(f"❌ Código '{gaiola_alvo}' não encontrado.")
-                    st.session_state.dados_rota = None
 
             except Exception as e:
                 st.error(f"Erro: {e}")
 
-    # --- EXIBIÇÃO PERMANENTE (Puxa da memória) ---
     if st.session_state.dados_rota is not None:
         saida = st.session_state.dados_rota
-        num_unicos = len(saida['Parada'].unique())
         
         c1, c2, c3 = st.columns(3)
         c1.metric("📦 Pacotes", len(saida))
-        c2.metric("📍 Paradas Reais", num_unicos)
+        c2.metric("📍 Paradas Reais", len(saida['Parada'].unique()))
         c3.metric("🏪 Comércios", len(saida[saida['Tipo'] == "🏪 Comércio"]))
 
-        st.dataframe(saida, use_container_width=True)
+        st.dataframe(saida[['Parada', 'Gaiola', 'Tipo', 'Endereco_Completo']], use_container_width=True)
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            saida.to_excel(writer, index=False)
+            saida[['Parada', 'Gaiola', 'Tipo', 'Endereco_Completo']].to_excel(writer, index=False)
         
         st.download_button(
-            label=f"📥 BAIXAR PLANILHA ({st.session_state.gaiola_atual})",
+            label=f"📥 BAIXAR ROTA {st.session_state.gaiola_atual}",
             data=output.getvalue(),
             file_name=f"Rota_{st.session_state.gaiola_atual}.xlsx",
             use_container_width=True
         )
 
-        # --- PROCESSO 2: MAPA (Só roda se o checkbox estiver marcado) ---
+        # --- PROCESSO 2: MAPA COM BAIRRO OBRIGATÓRIO ---
         if visualizar_mapa and MAPA_DISPONIVEL:
             st.divider()
-            st.subheader("📍 Mapa Prévio da Rota")
             
-            # Usamos cache para não re-mapear toda vez que a página atualizar
             @st.cache_data(show_spinner=False)
-            def obter_coordenadas(df_enderecos):
-                geolocator = Nominatim(user_agent="rota_estratega_v3")
+            def buscar_coords_com_bairro(df):
+                geolocator = Nominatim(user_agent="estratega_v5_bairro_foc")
                 coords = []
-                df_u = df_enderecos.drop_duplicates(subset=['Parada'])
+                df_u = df.drop_duplicates(subset=['Parada'])
                 total = len(df_u)
                 
-                # Criamos um container para o progresso dentro da função
                 pbar = st.progress(0)
                 status = st.empty()
                 
                 for i, r in enumerate(df_u.itertuples()):
                     try:
-                        loc = geolocator.geocode(f"{r.Endereco_Completo}, Brasil", timeout=10)
+                        # Busca obrigatória com Bairro
+                        loc = geolocator.geocode(r.Busca_GPS, timeout=10)
                         if loc:
-                            coords.append([loc.latitude, loc.longitude, r.Endereco_Completo])
+                            coords.append([loc.latitude, loc.longitude, r.Endereco_Completo, r.Parada])
                     except:
                         pass
+                    
                     pbar.progress((i+1)/total)
-                    status.text(f"Mapeando {i+1}/{total}...")
-                    time.sleep(1.1)
+                    status.text(f"Geolocalizando com bairro: parada {i+1} de {total}...")
+                    time.sleep(1.2)
                 
                 pbar.empty()
                 status.empty()
                 return coords
 
-            pontos = obter_coordenadas(saida)
+            pontos = buscar_coords_com_bairro(saida)
 
             if pontos:
-                m = folium.Map(location=[pontos[0][0], pontos[0][1]], zoom_start=12)
+                st.subheader(f"📍 Mapa da Rota ({len(pontos)} pontos localizados com precisão)")
+                m = folium.Map(location=[pontos[0][0], pontos[0][1]], zoom_start=12, tiles="cartodbpositron")
                 for p in pontos:
                     folium.CircleMarker(
                         location=[p[0], p[1]], 
-                        radius=4, 
+                        radius=5, 
                         color='red', 
-                        fill=True,
-                        popup=p[2]
+                        fill=True, 
+                        fill_opacity=0.7,
+                        popup=f"Parada {p[3]}: {p[2]}"
                     ).add_to(m)
-                st_folium(m, width=700, height=450)
+                st_folium(m, width="100%", height=500)
             else:
-                st.warning("Não foi possível localizar os endereços no mapa.")
+                st.warning("Não foi possível localizar os endereços. Verifique se as colunas de endereço e bairro estão corretas.")

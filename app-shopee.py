@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import io
 import unicodedata
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
+import time
 
 # Configuração da página
 st.set_page_config(page_title="Filtro de Rotas para o Circuit", page_icon="🚚", layout="wide")
@@ -25,19 +28,20 @@ st.title("🚚 Filtro de Rotas para o Circuit")
 
 arquivo_upload = st.file_uploader("Selecione o arquivo Romaneio", type=["xlsx"])
 gaiola_alvo = st.text_input("Digite o código da Gaiola", placeholder="Ex: B-50").strip().upper()
+
+# Nova funcionalidade: Checkbox para o mapa
+visualizar_mapa = st.checkbox("📍 Gerar mapa da rota (Leva aprox. 1s por parada)", value=False)
+
 botao_executar = st.button("🚀 GERAR ROTA")
 
 def remover_acentos(texto):
-    """Transforma 'Clínica' em 'CLINICA' para evitar erros de detecção"""
     return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()
 
 def limpar_string(s):
-    """Limpeza para códigos de gaiola"""
     return "".join(filter(str.isalnum, str(s))).upper()
 
 def extrair_base_endereco(endereco_completo):
-    """Agrupa por Rua + Número para identificar paradas únicas"""
     partes = str(endereco_completo).split(',')
     if len(partes) >= 2:
         base = partes[0].strip() + " " + partes[1].strip()
@@ -46,35 +50,24 @@ def extrair_base_endereco(endereco_completo):
     return limpar_string(base)
 
 def identificar_comercio(endereco):
-    """
-    Detector de Comércio Refinado:
-    1. Ignora acentos.
-    2. Ignora Condomínios (considerados residenciais).
-    3. Verifica contexto negativo (ex: 'Perto da loja').
-    """
-    # Lista atualizada: CONDOMINIO removido para ser considerado Residencial
     termos_comerciais = [
         'LOJA', 'MERCADO', 'MERCEARIA', 'FARMACIA', 'DROGARIA', 'SHOPPING', 'CLINICA', 
         'HOSPITAL', 'POSTO', 'OFICINA', 'RESTAURANTE', 'LANCHONETE', 'PADARIA', 'PANIFICADORA',
         'ACADEMIA', 'ESCOLA', 'COLEGIO', 'FACULDADE', 'IGREJA', 'TEMPLO',
-        'EMPRESA', 'LTDA', 'MEI', 'SALA', 'SALAO', 'BARBEARIA', 'ESTACIONAMENTO', 'HOTEL', 'SUPERMERCADO', 'AMC', 'ATACADO', 'DISTRIBUIDORA', 'AUTOPECAS', 'VIDRAÇARIA', 'LABORATORIO', 'CLUBE', 'ASSOCIACAO', 'BOUTIQUE', 'MERCANTIL',
-        'DEPARTAMENTO', 'VARIEDADES', 'PIZZARIA', 'CHURRASCARIA', 'CARNES', 'PEIXARIA', 'FRUTARIA', 'HORTIFRUTI', 'FLORICULTURA'
+        'EMPRESA', 'LTDA', 'MEI', 'SALA', 'SALAO', 'BARBEARIA', 'ESTACIONAMENTO', 'HOTEL', 
+        'SUPERMERCADO', 'AMC', 'ATACADO', 'DISTRIBUIDORA', 'AUTOPECAS', 'VIDRAÇARIA', 
+        'LABORATORIO', 'CLUBE', 'ASSOCIACAO', 'BOUTIQUE', 'MERCANTIL',
+        'DEPARTAMENTO', 'VARIEDADES', 'PIZZARIA', 'CHURRASCARIA', 'CARNES', 'PEIXARIA', 
+        'FRUTARIA', 'HORTIFRUTI', 'FLORICULTURA'
     ]
-    
-    termos_anuladores = [
-        'FRENTE', 'LADO', 'PROXIMO', 'VIZINHO', 'DEFRONTE', 'ATRAS', 'DEPOIS', 'PERTO', 'VIZINHA'
-    ]
-    
+    termos_anuladores = ['FRENTE', 'LADO', 'PROXIMO', 'VIZINHO', 'DEFRONTE', 'ATRAS', 'DEPOIS', 'PERTO', 'VIZINHA']
     end_limpo = remover_acentos(endereco)
     partes = end_limpo.split(',')
-    
     for parte in partes:
         palavras = parte.split()
         for i, palavra in enumerate(palavras):
             p_limpa = "".join(filter(str.isalnum, palavra))
-            
             if any(termo == p_limpa for termo in termos_comerciais):
-                # Verifica se há um 'anulador' antes da palavra nesta parte do endereço
                 contexto_anterior = " ".join(palavras[:i])
                 if any(anul in contexto_anterior for anul in termos_anuladores):
                     continue 
@@ -91,7 +84,6 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
 
             for aba in xl.sheet_names:
                 df_raw = pd.read_excel(arquivo_upload, sheet_name=aba, header=None, engine='openpyxl')
-                
                 col_gaiola_idx = None
                 for col in df_raw.columns:
                     if df_raw[col].astype(str).apply(limpar_string).eq(target_limpo).any():
@@ -103,21 +95,20 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     mask = df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo
                     dados_filtrados = df_raw[mask].copy()
                     
+                    # Identificação de colunas
                     col_end_idx, col_bairro_idx = None, None
                     termos_end = ['ENDERE', 'LOGRA', 'ADDRESS', 'ADRESS', 'RUA', 'LOCAL']
                     termos_bair = ['BAIRRO', 'NEIGHBOR', 'SETOR', 'LOCALIDADE']
-
                     for r in range(min(15, len(df_raw))):
                         linha_cabecalho = [str(x).upper() for x in df_raw.iloc[r].values]
                         for i, val in enumerate(linha_cabecalho):
                             if any(t in val for t in termos_end): col_end_idx = i
                             if any(t in val for t in termos_bair): col_bairro_idx = i
-                    
                     if col_end_idx is None:
                         larguras = [len(str(x)) for x in dados_filtrados.iloc[0]]
                         col_end_idx = larguras.index(max(larguras))
 
-                    # Processamento
+                    # Processamento base
                     dados_filtrados['CHAVE_STOP'] = dados_filtrados[col_end_idx].apply(extrair_base_endereco)
                     unicos = dados_filtrados['CHAVE_STOP'].unique()
                     mapa_stops = {end: i + 1 for i, end in enumerate(unicos)}
@@ -128,10 +119,45 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     saida['Tipo'] = dados_filtrados[col_end_idx].apply(identificar_comercio)
                     
                     endereco_original = dados_filtrados[col_end_idx].astype(str)
-                    bairro = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
-                    saida['Endereco_Completo'] = endereco_original + ", " + bairro + "Fortaleza - CE"
+                    bairro_raw = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
+                    saida['Endereco_Completo'] = endereco_original + ", " + bairro_raw + "Fortaleza - CE"
 
-                    # Métricas
+                    # --- LÓGICA DO MAPA (GEOCODIFICAÇÃO) ---
+                    if visualizar_mapa:
+                        st.subheader("📍 Visualização Geográfica da Rota")
+                        geolocator = Nominatim(user_agent="estratega_rotas_fortaleza")
+                        coords = []
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        
+                        df_unicos = saida.drop_duplicates(subset=['Parada']).copy()
+                        total_paradas = len(df_unicos)
+                        
+                        for idx, row in enumerate(df_unicos.itertuples()):
+                            # Ajuste do endereço para melhor busca no mapa
+                            busca = f"{row.Endereco_Completo}, Brasil"
+                            try:
+                                location = geolocator.geocode(busca, timeout=10)
+                                if location:
+                                    coords.append({'lat': location.latitude, 'lon': location.longitude})
+                                else:
+                                    coords.append({'lat': None, 'lon': None})
+                            except:
+                                coords.append({'lat': None, 'lon': None})
+                            
+                            # Respeita o limite da API (1 req/seg)
+                            progress_bar.progress((idx + 1) / total_paradas)
+                            status_text.text(f"Mapeando parada {idx + 1} de {total_paradas}...")
+                            time.sleep(1)
+                        
+                        df_mapa = pd.DataFrame(coords).dropna()
+                        if not df_mapa.empty:
+                            st.map(df_mapa)
+                        else:
+                            st.warning("Não foi possível carregar os pontos no mapa.")
+                        status_text.empty()
+
+                    # Métricas e Tabela
                     c1, c2, c3 = st.columns(3)
                     c1.metric("📦 Pacotes", len(saida))
                     c2.metric("📍 Paradas Reais", len(unicos))

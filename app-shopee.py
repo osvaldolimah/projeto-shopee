@@ -73,10 +73,10 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = ender + ", " + bairro + "Fortaleza - CE"
 
-                    # Métricas rápidas
+                    # Métricas rápidas com a correção gramatical
                     c1, c2, c3 = st.columns(3)
                     c1.metric("📦 Pacotes", len(saida))
-                    c2.metric("📍 Paradas Real", len(condominios_unicos))
+                    c2.metric("📍 Paradas Reais", len(condominios_unicos))
                     c3.metric("🏢 Economia", f"{len(saida) - len(condominios_unicos)} entregas")
 
                     st.dataframe(saida, use_container_width=True)

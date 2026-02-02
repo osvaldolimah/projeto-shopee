@@ -3,7 +3,7 @@ import pandas as pd
 import io
 import unicodedata
 
-# Configuração da página
+# Configuração da página para máxima compatibilidade
 st.set_page_config(
     page_title="Filtro de Rotas e Paradas", 
     page_icon="🚚", 
@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- SISTEMA DE DESIGN (CSS SEGURO E RESPONSIVO) ---
+# --- SISTEMA DE DESIGN (CSS RESPONSIVO E TRADUÇÃO) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
@@ -27,7 +27,7 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
 
-    /* Cabeçalho */
+    /* Cabeçalho Responsivo */
     .header-container {
         text-align: center;
         padding: 20px 10px;
@@ -76,33 +76,35 @@ st.markdown("""
         flex-shrink: 0;
     }
 
-    /* --- TRADUÇÃO E ESTILO DO UPLOADER --- */
-    [data-testid="stFileUploader"] section button {
-        background-color: white !important;
-        border: 2px solid var(--shopee-orange) !important;
-        color: var(--shopee-orange) !important;
-        border-radius: 10px !important;
-        transition: transform 0.1s active !important;
+    /* Tradução do Botão de Seleção */
+    [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p {
+        font-size: 0 !important;
     }
-    
-    [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p { font-size: 0 !important; }
     [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p::before {
         content: "📁 Selecionar Romaneio";
         font-size: 16px !important;
+        font-family: 'Inter', sans-serif !important;
         font-weight: 700 !important;
         visibility: visible;
     }
 
-    [data-testid="stFileUploaderDropzoneInstructions"] div span { display: none !important; }
+    /* Tradução Instrução de Arraste */
+    [data-testid="stFileUploaderDropzoneInstructions"] div span {
+        display: none !important;
+    }
     [data-testid="stFileUploaderDropzoneInstructions"] div::after {
         content: "Arraste o Romaneio aqui";
+        font-family: 'Inter', sans-serif !important;
         font-size: 16px !important;
         color: var(--placeholder-color) !important;
         visibility: visible !important;
+        display: block !important;
     }
-    [data-testid="stFileUploaderDropzoneInstructions"] small { display: none !important; }
+    [data-testid="stFileUploaderDropzoneInstructions"] small {
+        display: none !important;
+    }
 
-    /* BOTÃO PRINCIPAL COM EFEITO DE CLIQUE REFORÇADO */
+    /* Botão Principal Shopee com Efeito de Clique */
     div.stButton > button {
         background-color: var(--shopee-orange) !important;
         color: white !important;
@@ -113,14 +115,11 @@ st.markdown("""
         height: 60px !important;
         box-shadow: 0 6px 15px rgba(238, 77, 45, 0.3) !important;
         border: none !important;
-        transition: all 0.1s ease !important;
+        transition: all 0.1s ease;
     }
-    
-    div.stButton > button:active {
-        transform: scale(0.96) !important;
-        box-shadow: 0 2px 5px rgba(238, 77, 45, 0.2) !important;
-    }
+    div.stButton > button:active { transform: scale(0.96); }
 
+    /* Estilo das Métricas */
     div[data-testid="metric-container"] {
         background: white;
         border-radius: 12px;
@@ -130,7 +129,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CABEÇALHO ---
+# --- HEADER ---
 st.markdown('<div class="header-container"><h1 class="main-title">Filtro de Rotas e Paradas</h1></div>', unsafe_allow_html=True)
 
 # --- SESSÃO ---
@@ -184,88 +183,53 @@ def identificar_comercio(endereco):
                 if not any(anul in " ".join(palavras[:i]) for anul in termos_anuladores): return "🏪 Comércio"
     return "🏠 Residencial"
 
-# --- PROCESSAMENTO ---
 if arquivo_upload is not None and gaiola_alvo and botao_executar:
     with st.spinner('⚙️ Organizando carga...'):
         try:
             xl = pd.ExcelFile(arquivo_upload)
-            target_limpo = limpar_string(gaiola_alvo)
-            encontrado = False
-
+            target_limpo, encontrado = limpar_string(gaiola_alvo), False
             for aba in xl.sheet_names:
                 df_raw = pd.read_excel(xl, sheet_name=aba, header=None, engine='openpyxl')
                 col_gaiola_idx = next((col for col in df_raw.columns if df_raw[col].astype(str).apply(limpar_string).eq(target_limpo).any()), None)
-                
                 if col_gaiola_idx is not None:
                     encontrado = True
-                    mask = df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo
-                    df_filt = df_raw[mask].copy()
-                    
+                    df_filt = df_raw[df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo].copy()
                     col_end_idx, col_bairro_idx = None, None
                     for r in range(min(15, len(df_raw))):
                         linha = [str(x).upper() for x in df_raw.iloc[r].values]
                         for i, val in enumerate(linha):
                             if any(t in val for t in ['ENDERE', 'LOGRA', 'RUA']): col_end_idx = i
                             if any(t in val for t in ['BAIRRO', 'SETOR']): col_bairro_idx = i
-                    
                     if col_end_idx is None: col_end_idx = df_filt.apply(lambda x: x.astype(str).map(len).max()).idxmax()
 
                     df_filt['CHAVE_STOP'] = df_filt[col_end_idx].apply(extrair_base_endereco)
                     mapa_stops = {end: i + 1 for i, end in enumerate(df_filt['CHAVE_STOP'].unique())}
                     
                     saida = pd.DataFrame()
-                    saida['Parada'] = df_filt['CHAVE_STOP'].map(mapa_stops)
+                    # AQUI ESTÁ A SOLUÇÃO: Transformamos a Parada em STRING (texto)
+                    saida['Parada'] = df_filt['CHAVE_STOP'].map(mapa_stops).astype(str)
                     saida['Gaiola'] = df_filt[col_gaiola_idx]
                     saida['Tipo'] = df_filt[col_end_idx].apply(identificar_comercio)
-                    
                     bairro = (df_filt[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = df_filt[col_end_idx].astype(str) + ", " + bairro + "Fortaleza - CE"
 
                     buffer = io.BytesIO()
-                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                        saida.to_excel(writer, index=False)
-                    
-                    st.session_state.dados_prontos = buffer.getvalue()
-                    st.session_state.df_visualizacao = saida
-                    st.session_state.nome_arquivo = f"Rota_{gaiola_alvo}.xlsx"
-                    st.session_state.metricas = {
-                        "pacotes": len(saida),
-                        "paradas": len(mapa_stops),
-                        "comercios": len(saida[saida['Tipo'] == "🏪 Comércio"])
-                    }
+                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer: saida.to_excel(writer, index=False)
+                    st.session_state.dados_prontos, st.session_state.df_visualizacao, st.session_state.nome_arquivo = buffer.getvalue(), saida, f"Rota_{gaiola_alvo}.xlsx"
+                    st.session_state.metricas = {"pacotes": len(saida), "paradas": len(mapa_stops), "comercios": len(saida[saida['Tipo'] == "🏪 Comércio"])}
                     break
-
-            if not encontrado:
-                st.error(f"❌ Gaiola '{gaiola_alvo}' não encontrada.")
-                st.session_state.dados_prontos = None
-
-        except Exception as e:
-            st.error(f"⚠️ Erro: {e}")
+            if not encontrado: st.error(f"❌ Gaiola '{gaiola_alvo}' não encontrada.")
+        except Exception as e: st.error(f"⚠️ Erro: {e}")
 
 # --- RESULTADOS ---
 if st.session_state.dados_prontos:
     st.markdown("---")
     m = st.session_state.metricas
     c1, c2, c3 = st.columns(3)
-    c1.metric("📦 Pacotes", m["pacotes"])
-    c2.metric("📍 Paradas", m["paradas"])
-    c3.metric("🏪 Comércios", m["comercios"])
-
+    c1.metric("📦 Pacotes", m["pacotes"]); c2.metric("📍 Paradas", m["paradas"]); c3.metric("🏪 Comércios", m["comercios"])
+    
     st.markdown("##### 📊 Visualização da Rota")
-    # CORREÇÃO: Usando TextColumn para garantir alinhamento à esquerda sem erros
-    st.dataframe(
-        st.session_state.df_visual_copy if 'df_visual_copy' in globals() else st.session_state.df_visualizacao, 
-        use_container_width=True, 
-        hide_index=True,
-        column_config={
-            "Parada": st.column_config.TextColumn(alignment="left")
-        }
-    )
+    # Como 'Parada' agora é texto, o Streamlit já alinha à esquerda automaticamente!
+    st.dataframe(st.session_state.df_visualizacao, use_container_width=True, hide_index=True)
 
-    st.download_button(
-        label="📥 BAIXAR PLANILHA AGORA",
-        data=st.session_state.dados_prontos,
-        file_name=st.session_state.nome_arquivo,
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
-    )
+    st.download_button(label="📥 BAIXAR PLANILHA AGORA", data=st.session_state.dados_prontos, file_name=st.session_state.nome_arquivo, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)

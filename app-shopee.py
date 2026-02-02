@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import io
 import unicodedata
-import base64
 
 # Configuração da página
 st.set_page_config(
@@ -12,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- SISTEMA DE DESIGN (CSS PARA TRADUÇÃO E ESTABILIDADE) ---
+# --- SISTEMA DE DESIGN (CSS CORRIGIDO) ---
 st.markdown("""
     <style>
     :root {
@@ -22,6 +21,7 @@ st.markdown("""
 
     .stApp { background-color: var(--shopee-gray); }
 
+    /* Título */
     .main-title {
         color: var(--shopee-orange);
         font-weight: 800;
@@ -29,6 +29,7 @@ st.markdown("""
         margin-bottom: 5px;
     }
 
+    /* Tutorial Card */
     .tutorial-card {
         background-color: white;
         padding: 15px;
@@ -38,52 +39,80 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
 
-    /* TRADUÇÃO DO BOTAO 'BROWSE FILES' */
+    /* --- TRADUÇÃO DO BOTÃO 'BROWSE FILES' (NOVA TÉCNICA) --- */
+    /* Estiliza o botão do uploader */
     [data-testid="stFileUploader"] section button {
         background-color: white !important;
         border: 2px solid var(--shopee-orange) !important;
         color: var(--shopee-orange) !important;
         border-radius: 8px !important;
+        transition: all 0.2s ease !important;
+        position: relative;
     }
-    [data-testid="stFileUploader"] section button span::after {
+
+    /* Esconde o texto original sem quebrar o botão */
+    [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p {
+        font-size: 0 !important;
+    }
+
+    /* Injeta o texto em português */
+    [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p::before {
         content: "Selecionar Arquivo";
-        font-size: 16px;
-        font-weight: bold;
+        font-size: 16px !important;
+        font-weight: bold !important;
+        visibility: visible;
     }
-    [data-testid="stFileUploader"] section button span { display: none; }
 
-    [data-testid="stFileUploaderDropzoneInstructions"] div span { display: none; }
-    [data-testid="stFileUploaderDropzoneInstructions"] div::after {
-        content: "Arraste o Romaneio (.xlsx) aqui";
-        color: #666;
-        font-weight: 500;
-    }
-    [data-testid="stFileUploaderDropzoneInstructions"] small { display: none !important; }
-
-    [data-testid="stFileUploaderDropzone"] {
-        border: 2px dashed var(--shopee-orange) !important;
+    /* Efeito de Clique no Selecionar Arquivo */
+    [data-testid="stFileUploader"] section button:active {
+        transform: scale(0.95) !important;
         background-color: #fffaf9 !important;
     }
 
-    /* Botão de Ação */
+    /* Tradução da frase 'Drag and drop' */
+    [data-testid="stFileUploaderDropzoneInstructions"] div span {
+        display: none !important;
+    }
+    [data-testid="stFileUploaderDropzoneInstructions"] div::after {
+        content: "Arraste o Romaneio aqui";
+        color: #666;
+        font-weight: 500;
+    }
+    [data-testid="stFileUploaderDropzoneInstructions"] small {
+        display: none !important;
+    }
+
+    /* BOTÃO PRINCIPAL (O Grande Laranja) */
     div.stButton > button {
         background-color: var(--shopee-orange) !important;
         color: white !important;
         font-size: 20px !important;
         font-weight: bold !important;
         border-radius: 12px !important;
-        height: 3.5em !important;
+        height: 3.2em !important;
         border: none !important;
-        box-shadow: 0 4px 15px rgba(238, 77, 45, 0.25) !important;
+        box-shadow: 0 4px 15px rgba(238, 77, 45, 0.2) !important;
+        transition: all 0.2s ease !important;
     }
+
+    /* Efeito de Hover (Passar o mouse/dedo) */
+    div.stButton > button:hover {
+        background-color: #d73211 !important;
+        box-shadow: 0 6px 20px rgba(238, 77, 45, 0.4) !important;
+    }
+
+    /* Efeito de Clique (O botão 'afunda') */
+    div.stButton > button:active {
+        transform: scale(0.97) !important;
+        box-shadow: 0 2px 10px rgba(238, 77, 45, 0.2) !important;
+    }
+
     </style>
 """, unsafe_allow_html=True)
 
-# --- INICIALIZAÇÃO DA MEMÓRIA ---
+# --- INICIALIZAÇÃO DA SESSÃO ---
 if 'dados_prontos' not in st.session_state:
     st.session_state.dados_prontos = None
-if 'nome_arquivo' not in st.session_state:
-    st.session_state.nome_arquivo = ""
 
 # --- CABEÇALHO ---
 st.markdown('<h1 class="main-title">🚚 Shopee - Estrategista de Rotas</h1>', unsafe_allow_html=True)
@@ -91,10 +120,10 @@ st.markdown('<h1 class="main-title">🚚 Shopee - Estrategista de Rotas</h1>', u
 # --- TUTORIAL ---
 st.markdown("""
 <div class="tutorial-card">
-    <div style='display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px; font-size: 0.95rem;'>
-        <span><b>1.</b> Carregue o Romaneio 📄</span>
-        <span><b>2.</b> Digite a Gaiola 📦</span>
-        <span><b>3.</b> Gere a Rota 🚀</span>
+    <div style='display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px; font-size: 0.95rem; color: #444;'>
+        <span><b>1.</b> Selecione o Romaneio 📄</span>
+        <span><b>2.</b> Informe a Gaiola 📦</span>
+        <span><b>3.</b> Gere a Planilha 🚀</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -103,17 +132,17 @@ st.markdown("""
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.markdown("#### 📄 1. Enviar Romaneio")
-    arquivo_upload = st.file_uploader("Upload", type=["xlsx"], label_visibility="collapsed")
+    st.markdown("#### 📄 1. Arquivo do Dia")
+    arquivo_upload = st.file_uploader("", type=["xlsx"], label_visibility="collapsed")
 
 with col2:
     st.markdown("#### 📦 2. Código da Gaiola")
-    gaiola_alvo = st.text_input("Gaiola", placeholder="Ex: B-50", label_visibility="collapsed").strip().upper()
+    gaiola_alvo = st.text_input("", placeholder="Ex: B-50", label_visibility="collapsed").strip().upper()
 
 st.markdown("<br>", unsafe_allow_html=True)
-botao_executar = st.button("🚀 GERAR PLANILHA PARA O CIRCUIT")
+botao_executar = st.button("🚀 GERAR ROTA PARA O CIRCUIT")
 
-# --- FUNÇÕES DE LÓGICA ---
+# --- FUNÇÕES DE LÓGICA (GROUND ZERO) ---
 def remover_acentos(texto):
     return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()
@@ -199,7 +228,6 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro = (df_filt[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = df_filt[col_end_idx].astype(str) + ", " + bairro + "Fortaleza - CE"
 
-                    # Gerar bytes do Excel e salvar na sessão (Crucial para Mobile)
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                         saida.to_excel(writer, index=False)
@@ -220,7 +248,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
         except Exception as e:
             st.error(f"⚠️ Erro: {e}")
 
-# --- EXIBIÇÃO DOS RESULTADOS (FORA DO LOOP PARA ESTABILIDADE) ---
+# --- RESULTADOS ---
 if st.session_state.dados_prontos:
     st.markdown("---")
     m = st.session_state.metricas
@@ -229,7 +257,6 @@ if st.session_state.dados_prontos:
     c2.metric("📍 Paradas Reais", m["paradas"])
     c3.metric("🏪 Comércios", m["comercios"])
 
-    # Botão de Download com tratamento para evitar AxiosError
     st.download_button(
         label="📥 CLIQUE AQUI PARA BAIXAR PLANILHA",
         data=st.session_state.dados_prontos,
@@ -237,4 +264,3 @@ if st.session_state.dados_prontos:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
-    st.info("💡 Dica: Se o erro persistir, tente abrir o link no navegador 'Samsung Internet' ou 'Safari' em vez de usar o navegador interno do WhatsApp/Instagram.")

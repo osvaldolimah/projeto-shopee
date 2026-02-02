@@ -75,8 +75,7 @@ st.markdown("""
         flex-shrink: 0;
     }
 
-    /* --- TRADUÇÃO DO UPLOADER (CORREÇÃO DEFINITIVA) --- */
-    /* Esconde o botão original Browse Files e injeta o novo texto */
+    /* TRADUÇÃO DO UPLOADER */
     [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p {
         font-size: 0 !important;
     }
@@ -87,11 +86,9 @@ st.markdown("""
         visibility: visible;
     }
 
-    /* Esconde o texto 'Drag and drop file here' */
     [data-testid="stFileUploaderDropzoneInstructions"] div span {
         display: none !important;
     }
-    /* Injeta o texto 'Arraste o arquivo aqui' */
     [data-testid="stFileUploaderDropzoneInstructions"] div::after {
         content: "Arraste o Romaneio aqui";
         font-size: 16px !important;
@@ -99,7 +96,6 @@ st.markdown("""
         visibility: visible !important;
         display: block !important;
     }
-    /* Esconde o limite de tamanho (200MB) */
     [data-testid="stFileUploaderDropzoneInstructions"] small {
         display: none !important;
     }
@@ -160,12 +156,13 @@ with col_file:
 
 with col_cage:
     st.markdown("##### 📦 Passo 2")
-    gaiola_alvo = st.text_input("", placeholder="Ex: B-20", label_visibility="collapsed").strip().upper()
+    # Placeholder atualizado conforme solicitado
+    gaiola_alvo = st.text_input("", placeholder="Digite sua gaiola aqui", label_visibility="collapsed").strip().upper()
 
 st.markdown("<br>", unsafe_allow_html=True)
 botao_executar = st.button("🚀 GERAR ROTA AGORA")
 
-# --- LÓGICA ---
+# --- LÓGICA (GROUND ZERO) ---
 def remover_acentos(texto):
     return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()

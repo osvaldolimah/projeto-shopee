@@ -3,7 +3,7 @@ import pandas as pd
 import io
 import unicodedata
 
-# Configuração da página para máxima compatibilidade
+# Configuração da página
 st.set_page_config(
     page_title="Filtro de Rotas e Paradas", 
     page_icon="🚚", 
@@ -11,19 +11,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- SISTEMA DE DESIGN AVANÇADO (CSS RESPONSIVO) ---
+# --- SISTEMA DE DESIGN AVANÇADO (CSS RESPONSIVO COM TRADUÇÃO FIXA) ---
 st.markdown("""
     <style>
-    /* Importação de fonte moderna */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
 
     :root {
         --shopee-orange: #EE4D2D;
         --shopee-bg: #F6F6F6;
-        --text-dark: #222222;
     }
 
-    /* Reset Geral */
     .stApp { 
         background-color: var(--shopee-bg);
         font-family: 'Inter', sans-serif;
@@ -42,13 +39,12 @@ st.markdown("""
 
     .main-title {
         color: var(--shopee-orange);
-        font-size: clamp(1.5rem, 5vw, 2.5rem); /* Ajusta conforme a tela */
+        font-size: clamp(1.4rem, 5vw, 2.2rem);
         font-weight: 800;
         margin: 0;
-        line-height: 1.2;
     }
 
-    /* Tutorial Estilizado como Lista de Passos */
+    /* Tutorial Section */
     .tutorial-section {
         background: white;
         padding: 15px;
@@ -79,16 +75,11 @@ st.markdown("""
         flex-shrink: 0;
     }
 
-    /* Tradução e Estilo do Botão de Upload */
-    [data-testid="stFileUploader"] section button {
-        width: 100% !important;
-        background-color: white !important;
-        border: 2px solid var(--shopee-orange) !important;
-        color: var(--shopee-orange) !important;
-        height: 50px !important;
-        border-radius: 10px !important;
+    /* --- TRADUÇÃO DO UPLOADER (CORREÇÃO DEFINITIVA) --- */
+    /* Esconde o botão original Browse Files e injeta o novo texto */
+    [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p {
+        font-size: 0 !important;
     }
-    [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p { font-size: 0 !important; }
     [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p::before {
         content: "📁 Selecionar Romaneio";
         font-size: 16px !important;
@@ -96,15 +87,24 @@ st.markdown("""
         visibility: visible;
     }
 
-    /* Estilização do Campo de Texto (Gaiola) */
-    .stTextInput input {
-        height: 50px !important;
-        border-radius: 10px !important;
-        border: 1px solid #ddd !important;
+    /* Esconde o texto 'Drag and drop file here' */
+    [data-testid="stFileUploaderDropzoneInstructions"] div span {
+        display: none !important;
+    }
+    /* Injeta o texto 'Arraste o arquivo aqui' */
+    [data-testid="stFileUploaderDropzoneInstructions"] div::after {
+        content: "Arraste o Romaneio aqui";
         font-size: 16px !important;
+        color: #666 !important;
+        visibility: visible !important;
+        display: block !important;
+    }
+    /* Esconde o limite de tamanho (200MB) */
+    [data-testid="stFileUploaderDropzoneInstructions"] small {
+        display: none !important;
     }
 
-    /* Botão de Ação Shopee */
+    /* Estilo do Botão Principal Shopee */
     div.stButton > button {
         background-color: var(--shopee-orange) !important;
         color: white !important;
@@ -115,64 +115,57 @@ st.markdown("""
         height: 60px !important;
         box-shadow: 0 6px 15px rgba(238, 77, 45, 0.3) !important;
         border: none !important;
-        margin-top: 10px !important;
+        transition: 0.2s ease;
     }
+    div.stButton > button:active { transform: scale(0.97); }
 
-    /* Tabelas e Métricas */
+    /* Estilo das Métricas */
     div[data-testid="metric-container"] {
         background: white;
-        border-radius: 10px;
+        border-radius: 12px;
         padding: 10px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border-bottom: 3px solid var(--shopee-orange);
     }
 
-    /* Ajustes para Celular (Media Query) */
     @media (max-width: 768px) {
-        .main-title { font-size: 1.6rem; }
-        .step-item { font-size: 0.85rem; }
-        .stMetric { margin-bottom: 10px; }
+        .main-title { font-size: 1.4rem; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- HEADER RESPONSIVO ---
-st.markdown("""
-    <div class="header-container">
-        <h1 class="main-title">Filtro de Rotas e Paradas</h1>
-    </div>
-""", unsafe_allow_html=True)
+# --- HEADER ---
+st.markdown('<div class="header-container"><h1 class="main-title">Filtro de Rotas e Paradas</h1></div>', unsafe_allow_html=True)
 
-# --- INICIALIZAÇÃO DA SESSÃO ---
+# --- SESSÃO ---
 if 'dados_prontos' not in st.session_state:
     st.session_state.dados_prontos = None
 if 'df_visualizacao' not in st.session_state:
     st.session_state.df_visualizacao = None
 
-# --- TUTORIAL PROFISSIONAL ---
+# --- TUTORIAL ---
 st.markdown("""
 <div class="tutorial-section">
-    <div class="step-item"><div class="step-badge">1</div><span>Escolha o arquivo <b>.xlsx</b> do romaneio.</span></div>
-    <div class="step-item"><div class="step-badge">2</div><span>Digite o código da <b>Gaiola</b> desejada.</span></div>
-    <div class="step-item"><div class="step-badge">3</div><span>Clique em <b>Gerar</b> e importe no Circuit.</span></div>
+    <div class="step-item"><div class="step-badge">1</div><span>Selecione o arquivo <b>.xlsx</b> do romaneio.</span></div>
+    <div class="step-item"><div class="step-badge">2</div><span>Digite o código da <b>Gaiola</b>.</span></div>
+    <div class="step-item"><div class="step-badge">3</div><span>Baixe a planilha para o seu <b>Circuit</b>.</span></div>
 </div>
 """, unsafe_allow_html=True)
 
-# --- ÁREA DE OPERAÇÃO ---
+# --- INPUTS ---
 col_file, col_cage = st.columns([1, 1])
 
 with col_file:
-    st.markdown("##### 📥 Passo 1: Romaneio")
-    arquivo_upload = st.file_uploader("Upload", type=["xlsx"], label_visibility="collapsed")
+    st.markdown("##### 📥 Passo 1")
+    arquivo_upload = st.file_uploader("", type=["xlsx"], label_visibility="collapsed")
 
 with col_cage:
-    st.markdown("##### 📦 Passo 2: Gaiola")
-    gaiola_alvo = st.text_input("Gaiola", placeholder="Ex: B-20", label_visibility="collapsed").strip().upper()
+    st.markdown("##### 📦 Passo 2")
+    gaiola_alvo = st.text_input("", placeholder="Ex: B-20", label_visibility="collapsed").strip().upper()
 
-st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
 botao_executar = st.button("🚀 GERAR ROTA AGORA")
 
-# --- LÓGICA DE PROCESSAMENTO (GROUND ZERO) ---
+# --- LÓGICA ---
 def remover_acentos(texto):
     return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()
@@ -276,7 +269,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
         except Exception as e:
             st.error(f"⚠️ Erro: {e}")
 
-# --- RESULTADOS E VISUALIZAÇÃO ---
+# --- RESULTADOS ---
 if st.session_state.dados_prontos:
     st.markdown("---")
     m = st.session_state.metricas

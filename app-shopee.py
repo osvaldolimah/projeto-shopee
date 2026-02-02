@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- SISTEMA DE DESIGN AVANÇADO (CSS RESPONSIVO COM TRADUÇÃO FIXA) ---
+# --- SISTEMA DE DESIGN (CSS COM FOCO EM CONSISTÊNCIA) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
@@ -19,6 +19,8 @@ st.markdown("""
     :root {
         --shopee-orange: #EE4D2D;
         --shopee-bg: #F6F6F6;
+        /* Cor de placeholder padrão do Streamlit para manter a transparência */
+        --placeholder-color: rgba(49, 51, 63, 0.4); 
     }
 
     .stApp { 
@@ -26,7 +28,7 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
 
-    /* Cabeçalho Responsivo */
+    /* Cabeçalho */
     .header-container {
         text-align: center;
         padding: 20px 10px;
@@ -75,24 +77,29 @@ st.markdown("""
         flex-shrink: 0;
     }
 
-    /* TRADUÇÃO DO UPLOADER */
+    /* --- ESTILIZAÇÃO PADRONIZADA (PASSO 1 E PASSO 2) --- */
+    
+    /* Botão de Seleção (Passo 1) */
     [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p {
         font-size: 0 !important;
     }
     [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p::before {
         content: "📁 Selecionar Romaneio";
         font-size: 16px !important;
+        font-family: 'Inter', sans-serif !important;
         font-weight: 700 !important;
         visibility: visible;
     }
 
+    /* Instrução de Arraste (Passo 1) - IGUAL AO PLACEHOLDER DO PASSO 2 */
     [data-testid="stFileUploaderDropzoneInstructions"] div span {
         display: none !important;
     }
     [data-testid="stFileUploaderDropzoneInstructions"] div::after {
         content: "Arraste o Romaneio aqui";
+        font-family: 'Inter', sans-serif !important;
         font-size: 16px !important;
-        color: #666 !important;
+        color: var(--placeholder-color) !important;
         visibility: visible !important;
         display: block !important;
     }
@@ -100,7 +107,14 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Estilo do Botão Principal Shopee */
+    /* Placeholder do Campo de Gaiola (Passo 2) */
+    .stTextInput input::placeholder {
+        font-family: 'Inter', sans-serif !important;
+        font-size: 16px !important;
+        color: var(--placeholder-color) !important;
+    }
+
+    /* --- RESTANTE DO LAYOUT --- */
     div.stButton > button {
         background-color: var(--shopee-orange) !important;
         color: white !important;
@@ -111,20 +125,14 @@ st.markdown("""
         height: 60px !important;
         box-shadow: 0 6px 15px rgba(238, 77, 45, 0.3) !important;
         border: none !important;
-        transition: 0.2s ease;
     }
     div.stButton > button:active { transform: scale(0.97); }
 
-    /* Estilo das Métricas */
     div[data-testid="metric-container"] {
         background: white;
         border-radius: 12px;
         padding: 10px;
         border-bottom: 3px solid var(--shopee-orange);
-    }
-
-    @media (max-width: 768px) {
-        .main-title { font-size: 1.4rem; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -156,7 +164,6 @@ with col_file:
 
 with col_cage:
     st.markdown("##### 📦 Passo 2")
-    # Placeholder atualizado conforme solicitado
     gaiola_alvo = st.text_input("", placeholder="Digite sua gaiola aqui", label_visibility="collapsed").strip().upper()
 
 st.markdown("<br>", unsafe_allow_html=True)

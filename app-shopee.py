@@ -138,7 +138,8 @@ def identificar_comercio(endereco):
         'DEPARTAMENTO', 'VARIEDADES', 'PIZZARIA', 'CHURRASCARIA', 'CARNES', 'PEIXARIA', 
         'FRUTARIA', 'HORTIFRUTI', 'FLORICULTURA'
     ]
-    termos_anuladores = ['FRENTE', 'LADO', 'PROXIMO', 'VIZINHO', 'DEFRONTE', 'ATRAS', 'DEPOIS', 'PERTO', 'VIZINHA']
+    termos_anuladores = ['FRENTE', 'LADO', 'PROXIMO', 'VIZINHO', 'DEFRONTE', 'ATRAS', 'DEPOIS', 'PERTO', 'VIZINHA', 'AO LADO', 'EM FRENTE', 'NA FRENTE', 'PRÓXIMO', 'PRÓXIMA', 'AO LADO DA', 'EM FRENTE A', 'DE FRENTE PARA',
+                         'EM FRENTE AO', 'EM FRENTE À', 'AO LADO DO', 'AO LADO DA', 'PERTO DE', 'PERTO DO', 'PERTO DA', 'ATRÁS DE', 'ATRÁS DO', 'ATRÁS DA', 'DEPOIS DE', 'DEPOIS DO', 'DEPOIS DA', 'VIZINHO DE', 'POR TRAS']
     end_limpo = remover_acentos(endereco)
     partes = end_limpo.split(',')
     for parte in partes:

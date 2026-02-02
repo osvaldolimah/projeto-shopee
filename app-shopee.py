@@ -3,9 +3,9 @@ import pandas as pd
 import io
 import unicodedata
 
-# Configuração da página
+# Configuração da página - Nome atualizado na aba do navegador
 st.set_page_config(
-    page_title="Shopee - Filtro de Rotas", 
+    page_title="Filtro de Rotas e Paradas", 
     page_icon="🚚", 
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -83,8 +83,8 @@ if 'dados_prontos' not in st.session_state:
 if 'df_visualizacao' not in st.session_state:
     st.session_state.df_visualizacao = None
 
-# --- CABEÇALHO ---
-st.markdown('<h1 class="main-title">🚚 Shopee - Estrategista de Rotas</h1>', unsafe_allow_html=True)
+# --- CABEÇALHO - Nome atualizado no app ---
+st.markdown('<h1 class="main-title">🚚 Filtro de Rotas e Paradas</h1>', unsafe_allow_html=True)
 
 # --- TUTORIAL ---
 st.markdown("""
@@ -174,6 +174,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     mask = df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo
                     df_filt = df_raw[mask].copy()
                     
+                    # Detecção automática de colunas
                     col_end_idx, col_bairro_idx = None, None
                     for r in range(min(15, len(df_raw))):
                         linha = [str(x).upper() for x in df_raw.iloc[r].values]
@@ -184,6 +185,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     if col_end_idx is None:
                         col_end_idx = df_filt.apply(lambda x: x.astype(str).map(len).max()).idxmax()
 
+                    # Criar Planilha de Saída
                     df_filt['CHAVE_STOP'] = df_filt[col_end_idx].apply(extrair_base_endereco)
                     mapa_stops = {end: i + 1 for i, end in enumerate(df_filt['CHAVE_STOP'].unique())}
                     
@@ -195,7 +197,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro = (df_filt[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = df_filt[col_end_idx].astype(str) + ", " + bairro + "Fortaleza - CE"
 
-                    # Salvar na Sessão
+                    # Salvar na Sessão (para estabilidade mobile)
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                         saida.to_excel(writer, index=False)
@@ -226,7 +228,7 @@ if st.session_state.dados_prontos:
     c2.metric("📍 Paradas Reais", m["paradas"])
     c3.metric("🏪 Comércios", m["comercios"])
 
-    # Tabela de Visualização Restaurada
+    # Tabela de Visualização
     st.markdown("### 📊 Prévia da Rota Gerada")
     st.dataframe(st.session_state.df_visualizacao, use_container_width=True)
 

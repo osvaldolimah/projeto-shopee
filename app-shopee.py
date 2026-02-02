@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import io
 import unicodedata
+import base64
 
 # Configuração da página
 st.set_page_config(
@@ -11,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- SISTEMA DE DESIGN (CSS EXTREMO PARA TRADUÇÃO) ---
+# --- SISTEMA DE DESIGN (CSS PARA TRADUÇÃO E ESTABILIDADE) ---
 st.markdown("""
     <style>
     :root {
@@ -21,7 +22,6 @@ st.markdown("""
 
     .stApp { background-color: var(--shopee-gray); }
 
-    /* Título Shopee */
     .main-title {
         color: var(--shopee-orange);
         font-weight: 800;
@@ -29,7 +29,6 @@ st.markdown("""
         margin-bottom: 5px;
     }
 
-    /* Tutorial Card */
     .tutorial-card {
         background-color: white;
         padding: 15px;
@@ -39,8 +38,7 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
 
-    /* --- TRADUÇÃO DO BOTAO 'BROWSE FILES' --- */
-    /* 1. Altera o texto do botão interno */
+    /* TRADUÇÃO DO BOTAO 'BROWSE FILES' */
     [data-testid="stFileUploader"] section button {
         background-color: white !important;
         border: 2px solid var(--shopee-orange) !important;
@@ -52,24 +50,16 @@ st.markdown("""
         font-size: 16px;
         font-weight: bold;
     }
-    [data-testid="stFileUploader"] section button span {
-        display: none;
-    }
+    [data-testid="stFileUploader"] section button span { display: none; }
 
-    /* 2. Altera o texto de instrução (Drag and Drop) */
-    [data-testid="stFileUploaderDropzoneInstructions"] div span {
-        display: none;
-    }
+    [data-testid="stFileUploaderDropzoneInstructions"] div span { display: none; }
     [data-testid="stFileUploaderDropzoneInstructions"] div::after {
         content: "Arraste o Romaneio (.xlsx) aqui";
         color: #666;
         font-weight: 500;
     }
-    [data-testid="stFileUploaderDropzoneInstructions"] small {
-        display: none !important;
-    }
+    [data-testid="stFileUploaderDropzoneInstructions"] small { display: none !important; }
 
-    /* Estilização da área de upload */
     [data-testid="stFileUploaderDropzone"] {
         border: 2px dashed var(--shopee-orange) !important;
         background-color: #fffaf9 !important;
@@ -88,6 +78,12 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+# --- INICIALIZAÇÃO DA MEMÓRIA ---
+if 'dados_prontos' not in st.session_state:
+    st.session_state.dados_prontos = None
+if 'nome_arquivo' not in st.session_state:
+    st.session_state.nome_arquivo = ""
 
 # --- CABEÇALHO ---
 st.markdown('<h1 class="main-title">🚚 Shopee - Estrategista de Rotas</h1>', unsafe_allow_html=True)
@@ -108,8 +104,7 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.markdown("#### 📄 1. Enviar Romaneio")
-    # Usamos o label como instrução principal caso o CSS falhe em algum navegador
-    arquivo_upload = st.file_uploader("Clique no botão abaixo ou arraste o arquivo", type=["xlsx"], label_visibility="collapsed")
+    arquivo_upload = st.file_uploader("Upload", type=["xlsx"], label_visibility="collapsed")
 
 with col2:
     st.markdown("#### 📦 2. Código da Gaiola")
@@ -118,7 +113,7 @@ with col2:
 st.markdown("<br>", unsafe_allow_html=True)
 botao_executar = st.button("🚀 GERAR PLANILHA PARA O CIRCUIT")
 
-# --- LÓGICA DE NEGÓCIO (GROUND ZERO) ---
+# --- FUNÇÕES DE LÓGICA ---
 def remover_acentos(texto):
     return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()
@@ -165,11 +160,11 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
     with st.spinner('⚙️ Organizando carga...'):
         try:
             xl = pd.ExcelFile(arquivo_upload)
-            encontrado = False
             target_limpo = limpar_string(gaiola_alvo)
+            encontrado = False
 
             for aba in xl.sheet_names:
-                df_raw = pd.read_excel(arquivo_upload, sheet_name=aba, header=None, engine='openpyxl')
+                df_raw = pd.read_excel(xl, sheet_name=aba, header=None, engine='openpyxl')
                 col_gaiola_idx = None
                 for col in df_raw.columns:
                     if df_raw[col].astype(str).apply(limpar_string).eq(target_limpo).any():
@@ -179,58 +174,67 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                 if col_gaiola_idx is not None:
                     encontrado = True
                     mask = df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo
-                    dados_filtrados = df_raw[mask].copy()
+                    df_filt = df_raw[mask].copy()
                     
-                    # Identificação de colunas
+                    # Detecção automática de colunas
                     col_end_idx, col_bairro_idx = None, None
-                    termos_end = ['ENDERE', 'LOGRA', 'ADDRESS', 'ADRESS', 'RUA', 'LOCAL']
-                    termos_bair = ['BAIRRO', 'NEIGHBOR', 'SETOR', 'LOCALIDADE']
-
                     for r in range(min(15, len(df_raw))):
-                        linha_cabecalho = [str(x).upper() for x in df_raw.iloc[r].values]
-                        for i, val in enumerate(linha_cabecalho):
-                            if any(t in val for t in termos_end): col_end_idx = i
-                            if any(t in val for t in termos_bair): col_bairro_idx = i
+                        linha = [str(x).upper() for x in df_raw.iloc[r].values]
+                        for i, val in enumerate(linha):
+                            if any(t in val for t in ['ENDERE', 'LOGRA', 'RUA']): col_end_idx = i
+                            if any(t in val for t in ['BAIRRO', 'SETOR']): col_bairro_idx = i
                     
                     if col_end_idx is None:
-                        larguras = [len(str(x)) for x in dados_filtrados.iloc[0]]
-                        col_end_idx = larguras.index(max(larguras))
+                        col_end_idx = df_filt.apply(lambda x: x.astype(str).map(len).max()).idxmax()
 
-                    dados_filtrados['CHAVE_STOP'] = dados_filtrados[col_end_idx].apply(extrair_base_endereco)
-                    unicos = dados_filtrados['CHAVE_STOP'].unique()
-                    mapa_stops = {end: i + 1 for i, end in enumerate(unicos)}
+                    # Criar Planilha de Saída
+                    df_filt['CHAVE_STOP'] = df_filt[col_end_idx].apply(extrair_base_endereco)
+                    mapa_stops = {end: i + 1 for i, end in enumerate(df_filt['CHAVE_STOP'].unique())}
                     
                     saida = pd.DataFrame()
-                    saida['Parada'] = dados_filtrados['CHAVE_STOP'].map(mapa_stops)
-                    saida['Gaiola'] = dados_filtrados[col_gaiola_idx]
-                    saida['Tipo'] = dados_filtrados[col_end_idx].apply(identificar_comercio)
+                    saida['Parada'] = df_filt['CHAVE_STOP'].map(mapa_stops)
+                    saida['Gaiola'] = df_filt[col_gaiola_idx]
+                    saida['Tipo'] = df_filt[col_end_idx].apply(identificar_comercio)
                     
-                    endereco_original = dados_filtrados[col_end_idx].astype(str)
-                    bairro = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
-                    saida['Endereco_Completo'] = endereco_original + ", " + bairro + "Fortaleza - CE"
+                    bairro = (df_filt[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
+                    saida['Endereco_Completo'] = df_filt[col_end_idx].astype(str) + ", " + bairro + "Fortaleza - CE"
 
-                    st.markdown("---")
-                    m1, m2, m3 = st.columns(3)
-                    m1.metric("📦 Pacotes", len(saida))
-                    m2.metric("📍 Paradas Reais", len(unicos))
-                    m3.metric("🏪 Comércios", len(saida[saida['Tipo'] == "🏪 Comércio"]))
-
-                    st.dataframe(saida, use_container_width=True)
-
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    # Gerar bytes do Excel e salvar na sessão (Crucial para Mobile)
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                         saida.to_excel(writer, index=False)
                     
-                    st.download_button(
-                        label=f"📥 BAIXAR ROTA PARA O CIRCUIT",
-                        data=output.getvalue(),
-                        file_name=f"Rota_{gaiola_alvo}.xlsx",
-                        use_container_width=True
-                    )
+                    st.session_state.dados_prontos = buffer.getvalue()
+                    st.session_state.nome_arquivo = f"Rota_{gaiola_alvo}.xlsx"
+                    st.session_state.metricas = {
+                        "pacotes": len(saida),
+                        "paradas": len(mapa_stops),
+                        "comercios": len(saida[saida['Tipo'] == "🏪 Comércio"])
+                    }
                     break
 
             if not encontrado:
                 st.error(f"❌ Gaiola '{gaiola_alvo}' não encontrada.")
+                st.session_state.dados_prontos = None
 
         except Exception as e:
-            st.error(f"⚠️ Erro ao processar: {e}")
+            st.error(f"⚠️ Erro: {e}")
+
+# --- EXIBIÇÃO DOS RESULTADOS (FORA DO LOOP PARA ESTABILIDADE) ---
+if st.session_state.dados_prontos:
+    st.markdown("---")
+    m = st.session_state.metricas
+    c1, c2, c3 = st.columns(3)
+    c1.metric("📦 Pacotes", m["pacotes"])
+    c2.metric("📍 Paradas Reais", m["paradas"])
+    c3.metric("🏪 Comércios", m["comercios"])
+
+    # Botão de Download com tratamento para evitar AxiosError
+    st.download_button(
+        label="📥 CLIQUE AQUI PARA BAIXAR PLANILHA",
+        data=st.session_state.dados_prontos,
+        file_name=st.session_state.nome_arquivo,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+    st.info("💡 Dica: Se o erro persistir, tente abrir o link no navegador 'Samsung Internet' ou 'Safari' em vez de usar o navegador interno do WhatsApp/Instagram.")

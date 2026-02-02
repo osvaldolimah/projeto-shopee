@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- SISTEMA DE DESIGN (CSS CORRIGIDO) ---
+# --- SISTEMA DE DESIGN (CSS SHOPEE PREMIUM) ---
 st.markdown("""
     <style>
     :root {
@@ -21,7 +21,6 @@ st.markdown("""
 
     .stApp { background-color: var(--shopee-gray); }
 
-    /* Título */
     .main-title {
         color: var(--shopee-orange);
         font-weight: 800;
@@ -29,7 +28,6 @@ st.markdown("""
         margin-bottom: 5px;
     }
 
-    /* Tutorial Card */
     .tutorial-card {
         background-color: white;
         padding: 15px;
@@ -39,23 +37,15 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
 
-    /* --- TRADUÇÃO DO BOTÃO 'BROWSE FILES' (NOVA TÉCNICA) --- */
-    /* Estiliza o botão do uploader */
+    /* TRADUÇÃO DO BOTÃO 'BROWSE FILES' */
     [data-testid="stFileUploader"] section button {
         background-color: white !important;
         border: 2px solid var(--shopee-orange) !important;
         color: var(--shopee-orange) !important;
         border-radius: 8px !important;
         transition: all 0.2s ease !important;
-        position: relative;
     }
-
-    /* Esconde o texto original sem quebrar o botão */
-    [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p {
-        font-size: 0 !important;
-    }
-
-    /* Injeta o texto em português */
+    [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p { font-size: 0 !important; }
     [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p::before {
         content: "Selecionar Arquivo";
         font-size: 16px !important;
@@ -63,26 +53,15 @@ st.markdown("""
         visibility: visible;
     }
 
-    /* Efeito de Clique no Selecionar Arquivo */
-    [data-testid="stFileUploader"] section button:active {
-        transform: scale(0.95) !important;
-        background-color: #fffaf9 !important;
-    }
-
-    /* Tradução da frase 'Drag and drop' */
-    [data-testid="stFileUploaderDropzoneInstructions"] div span {
-        display: none !important;
-    }
+    [data-testid="stFileUploaderDropzoneInstructions"] div span { display: none !important; }
     [data-testid="stFileUploaderDropzoneInstructions"] div::after {
         content: "Arraste o Romaneio aqui";
         color: #666;
         font-weight: 500;
     }
-    [data-testid="stFileUploaderDropzoneInstructions"] small {
-        display: none !important;
-    }
+    [data-testid="stFileUploaderDropzoneInstructions"] small { display: none !important; }
 
-    /* BOTÃO PRINCIPAL (O Grande Laranja) */
+    /* BOTÃO PRINCIPAL */
     div.stButton > button {
         background-color: var(--shopee-orange) !important;
         color: white !important;
@@ -92,20 +71,8 @@ st.markdown("""
         height: 3.2em !important;
         border: none !important;
         box-shadow: 0 4px 15px rgba(238, 77, 45, 0.2) !important;
-        transition: all 0.2s ease !important;
     }
-
-    /* Efeito de Hover (Passar o mouse/dedo) */
-    div.stButton > button:hover {
-        background-color: #d73211 !important;
-        box-shadow: 0 6px 20px rgba(238, 77, 45, 0.4) !important;
-    }
-
-    /* Efeito de Clique (O botão 'afunda') */
-    div.stButton > button:active {
-        transform: scale(0.97) !important;
-        box-shadow: 0 2px 10px rgba(238, 77, 45, 0.2) !important;
-    }
+    div.stButton > button:active { transform: scale(0.97) !important; }
 
     </style>
 """, unsafe_allow_html=True)
@@ -113,6 +80,8 @@ st.markdown("""
 # --- INICIALIZAÇÃO DA SESSÃO ---
 if 'dados_prontos' not in st.session_state:
     st.session_state.dados_prontos = None
+if 'df_visualizacao' not in st.session_state:
+    st.session_state.df_visualizacao = None
 
 # --- CABEÇALHO ---
 st.markdown('<h1 class="main-title">🚚 Shopee - Estrategista de Rotas</h1>', unsafe_allow_html=True)
@@ -142,7 +111,7 @@ with col2:
 st.markdown("<br>", unsafe_allow_html=True)
 botao_executar = st.button("🚀 GERAR ROTA PARA O CIRCUIT")
 
-# --- FUNÇÕES DE LÓGICA (GROUND ZERO) ---
+# --- FUNÇÕES DE LÓGICA ---
 def remover_acentos(texto):
     return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()
@@ -205,7 +174,6 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     mask = df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo
                     df_filt = df_raw[mask].copy()
                     
-                    # Detecção automática de colunas
                     col_end_idx, col_bairro_idx = None, None
                     for r in range(min(15, len(df_raw))):
                         linha = [str(x).upper() for x in df_raw.iloc[r].values]
@@ -216,7 +184,6 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     if col_end_idx is None:
                         col_end_idx = df_filt.apply(lambda x: x.astype(str).map(len).max()).idxmax()
 
-                    # Criar Planilha de Saída
                     df_filt['CHAVE_STOP'] = df_filt[col_end_idx].apply(extrair_base_endereco)
                     mapa_stops = {end: i + 1 for i, end in enumerate(df_filt['CHAVE_STOP'].unique())}
                     
@@ -228,11 +195,13 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro = (df_filt[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = df_filt[col_end_idx].astype(str) + ", " + bairro + "Fortaleza - CE"
 
+                    # Salvar na Sessão
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                         saida.to_excel(writer, index=False)
                     
                     st.session_state.dados_prontos = buffer.getvalue()
+                    st.session_state.df_visualizacao = saida
                     st.session_state.nome_arquivo = f"Rota_{gaiola_alvo}.xlsx"
                     st.session_state.metricas = {
                         "pacotes": len(saida),
@@ -248,7 +217,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
         except Exception as e:
             st.error(f"⚠️ Erro: {e}")
 
-# --- RESULTADOS ---
+# --- RESULTADOS E VISUALIZAÇÃO ---
 if st.session_state.dados_prontos:
     st.markdown("---")
     m = st.session_state.metricas
@@ -257,6 +226,11 @@ if st.session_state.dados_prontos:
     c2.metric("📍 Paradas Reais", m["paradas"])
     c3.metric("🏪 Comércios", m["comercios"])
 
+    # Tabela de Visualização Restaurada
+    st.markdown("### 📊 Prévia da Rota Gerada")
+    st.dataframe(st.session_state.df_visualizacao, use_container_width=True)
+
+    # Botão de Download
     st.download_button(
         label="📥 CLIQUE AQUI PARA BAIXAR PLANILHA",
         data=st.session_state.dados_prontos,

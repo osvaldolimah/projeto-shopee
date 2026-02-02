@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- SISTEMA DE DESIGN (CSS CUSTOMIZADO) ---
+# --- SISTEMA DE DESIGN (CSS CUSTOMIZADO AVANÇADO) ---
 st.markdown("""
     <style>
     :root {
@@ -22,21 +22,22 @@ st.markdown("""
 
     .stApp { background-color: var(--shopee-gray); }
 
+    /* Título */
     .main-title {
         color: var(--shopee-orange);
         font-weight: 800;
         text-align: center;
-        padding-bottom: 10px;
-        margin-bottom: 10px;
+        margin-bottom: 20px;
     }
 
-    /* Card de Tutorial */
+    /* Tutorial Card */
     .tutorial-card {
         background-color: white;
         padding: 20px;
         border-radius: 15px;
-        border: 1px solid #ddd;
+        border: 1px solid #eee;
         margin-bottom: 25px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
     
     .step-number {
@@ -48,7 +49,45 @@ st.markdown("""
         margin-right: 10px;
     }
 
-    /* Botão Principal */
+    /* --- TRADUÇÃO E ESTILO DO BOTÃO DE UPLOAD --- */
+    /* Esconde o texto original "Browse files" */
+    section[data-testid="stFileUploader"] button {
+        font-size: 0 !important;
+        background-color: white !important;
+        border: 2px solid var(--shopee-orange) !important;
+        color: var(--shopee-orange) !important;
+        padding: 10px 20px !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Adiciona o texto "Selecionar Arquivo" no lugar */
+    section[data-testid="stFileUploader"] button::after {
+        content: "Selecionar Arquivo";
+        font-size: 16px !important;
+        font-weight: bold;
+    }
+
+    /* Estilização da zona de drop (arrastar) */
+    div[data-testid="stFileUploaderDropzone"] {
+        border: 2px dashed var(--shopee-orange) !important;
+        background-color: #fffaf9 !important;
+        border-radius: 12px !important;
+    }
+
+    /* Esconde as instruções em inglês (Drag and drop file here) */
+    div[data-testid="stFileUploaderDropzoneInstructions"] > div > span { visibility: hidden; }
+    div[data-testid="stFileUploaderDropzoneInstructions"] > div > small { display: none; }
+    
+    /* Adiciona instrução em português */
+    div[data-testid="stFileUploaderDropzoneInstructions"] > div > span::after {
+        content: "Arraste o Romaneio (.xlsx) para cá";
+        visibility: visible;
+        display: block;
+        color: #666;
+        margin-top: -20px;
+    }
+
+    /* Botão Principal Shopee */
     div.stButton > button:first-child {
         background-color: var(--shopee-orange);
         color: white;
@@ -56,59 +95,53 @@ st.markdown("""
         padding: 15px 30px;
         font-size: 20px;
         font-weight: bold;
-        border-radius: 10px;
+        border-radius: 12px;
         width: 100%;
-        box-shadow: 0 4px 10px rgba(238, 77, 45, 0.3);
+        box-shadow: 0 4px 15px rgba(238, 77, 45, 0.25);
+        transition: 0.3s ease;
     }
-    
-    /* Tradução do File Uploader */
-    div[data-testid="stFileUploaderDropzoneInstructions"] > div > span { visibility: hidden; }
-    div[data-testid="stFileUploaderDropzoneInstructions"] > div > small { display: none; }
-    div[data-testid="stFileUploaderDropzoneInstructions"] > div > span::after {
-        content: "📥 Arraste o Romaneio (.xlsx) aqui";
-        visibility: visible;
-        display: block;
-        color: var(--shopee-orange);
-        font-weight: bold;
+    div.stButton > button:hover {
+        background-color: #d73211;
+        transform: scale(1.01);
     }
     </style>
 """, unsafe_allow_html=True)
 
 # --- CABEÇALHO ---
-st.markdown('<h1 class="main-title">🚚 Filtro de Rotas</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">🚚 Shopee - Estrategista de Rotas</h1>', unsafe_allow_html=True)
 
-# --- TUTORIAL DE USO ---
-with st.container():
-    st.markdown("""
-    <div class="tutorial-card">
-        <h3 style='color: #333; margin-top: 0;'>📖 Como usar o App:</h3>
-        <div style='display: flex; justify-content: space-around; flex-wrap: wrap;'>
-            <div style='flex: 1; min-width: 200px; padding: 10px;'>
-                <span class="step-number">1</span> <b>Carregue</b> o arquivo Excel do romaneio oficial.
-            </div>
-            <div style='flex: 1; min-width: 200px; padding: 10px;'>
-                <span class="step-number">2</span> <b>Digite</b> o código da gaiola (ex: B-50) para filtrar.
-            </div>
-            <div style='flex: 1; min-width: 200px; padding: 10px;'>
-                <span class="step-number">3</span> <b>Baixe</b> a planilha limpa e importe no seu app <b>Circuit</b>.
-            </div>
+# --- TUTORIAL ---
+st.markdown("""
+<div class="tutorial-card">
+    <h3 style='color: #333; margin-top: 0; font-size: 1.2rem;'>📖 Guia Rápido:</h3>
+    <div style='display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px;'>
+        <div style='flex: 1; min-width: 250px;'>
+            <span class="step-number">1</span> <b>Carregue</b> o Romaneio do dia.
+        </div>
+        <div style='flex: 1; min-width: 250px;'>
+            <span class="step-number">2</span> <b>Digite</b> o código da sua gaiola.
+        </div>
+        <div style='flex: 1; min-width: 250px;'>
+            <span class="step-number">3</span> <b>Gere</b> a planilha para o <b>Circuit</b>.
         </div>
     </div>
-    """, unsafe_allow_html=True)
+</div>
+""", unsafe_allow_html=True)
 
-# --- ÁREA DE ENTRADA ---
+# --- INPUTS ---
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.markdown("#### 📄 Carregar Romaneio")
+    st.markdown("#### 📄 1. Enviar Romaneio")
+    # Deixamos o label vazio porque o CSS já adiciona a instrução
     arquivo_upload = st.file_uploader("", type=["xlsx"])
 
 with col2:
-    st.markdown("#### 📦 Código da Gaiola")
-    gaiola_alvo = st.text_input("", placeholder="Ex: A-12").strip().upper()
+    st.markdown("#### 📦 2. Código da Gaiola")
+    gaiola_alvo = st.text_input("", placeholder="Ex: B-25", label_visibility="collapsed").strip().upper()
 
 st.markdown("<br>", unsafe_allow_html=True)
-botao_executar = st.button("🚀 GERAR ROTA PARA O CIRCUIT")
+botao_executar = st.button("🚀 GERAR PLANILHA AGORA")
 
 # --- LÓGICA DE NEGÓCIO (GROUND ZERO) ---
 def remover_acentos(texto):
@@ -154,7 +187,7 @@ def identificar_comercio(endereco):
 
 # --- PROCESSAMENTO ---
 if arquivo_upload is not None and gaiola_alvo and botao_executar:
-    with st.spinner('⚙️ Organizando paradas...'):
+    with st.spinner('⚙️ Organizando seus pacotes...'):
         try:
             xl = pd.ExcelFile(arquivo_upload)
             encontrado = False
@@ -200,11 +233,10 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro = (dados_filtrados[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = endereco_original + ", " + bairro + "Fortaleza - CE"
 
-                    # MÉTRICAS DASHBOARD
                     st.markdown("---")
                     m1, m2, m3 = st.columns(3)
-                    m1.metric("📦 Pacotes", len(saida))
-                    m2.metric("📍 Paradas Reais", len(unicos))
+                    m1.metric("📦 Total Pacotes", len(saida))
+                    m2.metric("📍 Paradas Únicas", len(unicos))
                     m3.metric("🏪 Comércios", len(saida[saida['Tipo'] == "🏪 Comércio"]))
 
                     st.dataframe(saida, use_container_width=True)
@@ -214,7 +246,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                         saida.to_excel(writer, index=False)
                     
                     st.download_button(
-                        label=f"📥 BAIXAR ROTA ({len(unicos)} PARADAS)",
+                        label=f"📥 BAIXAR PLANILHA ({len(unicos)} PARADAS)",
                         data=output.getvalue(),
                         file_name=f"Rota_{gaiola_alvo}.xlsx",
                         use_container_width=True
@@ -222,7 +254,7 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     break
 
             if not encontrado:
-                st.error(f"❌ Gaiola '{gaiola_alvo}' não encontrada no arquivo.")
+                st.error(f"❌ Gaiola '{gaiola_alvo}' não encontrada.")
 
         except Exception as e:
-            st.error(f"⚠️ Erro ao processar: {e}")
+            st.error(f"⚠️ Erro técnico: {e}")

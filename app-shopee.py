@@ -3,7 +3,7 @@ import pandas as pd
 import io
 import unicodedata
 
-# Configuração da página - Nome atualizado na aba do navegador
+# Configuração da página para máxima compatibilidade
 st.set_page_config(
     page_title="Filtro de Rotas e Paradas", 
     page_icon="🚚", 
@@ -11,70 +11,136 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- SISTEMA DE DESIGN (CSS SHOPEE PREMIUM) ---
+# --- SISTEMA DE DESIGN AVANÇADO (CSS RESPONSIVO) ---
 st.markdown("""
     <style>
+    /* Importação de fonte moderna */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+
     :root {
         --shopee-orange: #EE4D2D;
-        --shopee-gray: #F5F5F5;
+        --shopee-bg: #F6F6F6;
+        --text-dark: #222222;
     }
 
-    .stApp { background-color: var(--shopee-gray); }
+    /* Reset Geral */
+    .stApp { 
+        background-color: var(--shopee-bg);
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Cabeçalho Responsivo */
+    .header-container {
+        text-align: center;
+        padding: 20px 10px;
+        background-color: white;
+        border-bottom: 4px solid var(--shopee-orange);
+        margin-bottom: 20px;
+        border-radius: 0 0 20px 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
 
     .main-title {
         color: var(--shopee-orange);
+        font-size: clamp(1.5rem, 5vw, 2.5rem); /* Ajusta conforme a tela */
         font-weight: 800;
-        text-align: center;
-        margin-bottom: 5px;
+        margin: 0;
+        line-height: 1.2;
     }
 
-    .tutorial-card {
-        background-color: white;
+    /* Tutorial Estilizado como Lista de Passos */
+    .tutorial-section {
+        background: white;
         padding: 15px;
-        border-radius: 12px;
-        border-left: 6px solid var(--shopee-orange);
+        border-radius: 15px;
         margin-bottom: 20px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.03);
     }
 
-    /* TRADUÇÃO DO BOTÃO 'BROWSE FILES' */
+    .step-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+        color: #555;
+    }
+
+    .step-badge {
+        background: var(--shopee-orange);
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 12px;
+        flex-shrink: 0;
+    }
+
+    /* Tradução e Estilo do Botão de Upload */
     [data-testid="stFileUploader"] section button {
+        width: 100% !important;
         background-color: white !important;
         border: 2px solid var(--shopee-orange) !important;
         color: var(--shopee-orange) !important;
-        border-radius: 8px !important;
-        transition: all 0.2s ease !important;
+        height: 50px !important;
+        border-radius: 10px !important;
     }
     [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p { font-size: 0 !important; }
     [data-testid="stFileUploader"] section button div[data-testid="stMarkdownContainer"] p::before {
-        content: "Selecionar Arquivo";
+        content: "📁 Selecionar Romaneio";
         font-size: 16px !important;
-        font-weight: bold !important;
+        font-weight: 700 !important;
         visibility: visible;
     }
 
-    [data-testid="stFileUploaderDropzoneInstructions"] div span { display: none !important; }
-    [data-testid="stFileUploaderDropzoneInstructions"] div::after {
-        content: "Arraste o Romaneio aqui";
-        color: #666;
-        font-weight: 500;
+    /* Estilização do Campo de Texto (Gaiola) */
+    .stTextInput input {
+        height: 50px !important;
+        border-radius: 10px !important;
+        border: 1px solid #ddd !important;
+        font-size: 16px !important;
     }
-    [data-testid="stFileUploaderDropzoneInstructions"] small { display: none !important; }
 
-    /* BOTÃO PRINCIPAL */
+    /* Botão de Ação Shopee */
     div.stButton > button {
         background-color: var(--shopee-orange) !important;
         color: white !important;
-        font-size: 20px !important;
-        font-weight: bold !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
         border-radius: 12px !important;
-        height: 3.2em !important;
+        width: 100% !important;
+        height: 60px !important;
+        box-shadow: 0 6px 15px rgba(238, 77, 45, 0.3) !important;
         border: none !important;
-        box-shadow: 0 4px 15px rgba(238, 77, 45, 0.2) !important;
+        margin-top: 10px !important;
     }
-    div.stButton > button:active { transform: scale(0.97) !important; }
 
+    /* Tabelas e Métricas */
+    div[data-testid="metric-container"] {
+        background: white;
+        border-radius: 10px;
+        padding: 10px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    /* Ajustes para Celular (Media Query) */
+    @media (max-width: 768px) {
+        .main-title { font-size: 1.6rem; }
+        .step-item { font-size: 0.85rem; }
+        .stMetric { margin-bottom: 10px; }
+    }
     </style>
+""", unsafe_allow_html=True)
+
+# --- HEADER RESPONSIVO ---
+st.markdown("""
+    <div class="header-container">
+        <h1 class="main-title">Filtro de Rotas e Paradas</h1>
+    </div>
 """, unsafe_allow_html=True)
 
 # --- INICIALIZAÇÃO DA SESSÃO ---
@@ -83,35 +149,30 @@ if 'dados_prontos' not in st.session_state:
 if 'df_visualizacao' not in st.session_state:
     st.session_state.df_visualizacao = None
 
-# --- CABEÇALHO - Nome atualizado no app ---
-st.markdown('<h1 class="main-title">🚚 Filtro de Rotas e Paradas</h1>', unsafe_allow_html=True)
-
-# --- TUTORIAL ---
+# --- TUTORIAL PROFISSIONAL ---
 st.markdown("""
-<div class="tutorial-card">
-    <div style='display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px; font-size: 0.95rem; color: #444;'>
-        <span><b>1.</b> Selecione o Romaneio 📄</span>
-        <span><b>2.</b> Informe a Gaiola 📦</span>
-        <span><b>3.</b> Gere a Planilha 🚀</span>
-    </div>
+<div class="tutorial-section">
+    <div class="step-item"><div class="step-badge">1</div><span>Escolha o arquivo <b>.xlsx</b> do romaneio.</span></div>
+    <div class="step-item"><div class="step-badge">2</div><span>Digite o código da <b>Gaiola</b> desejada.</span></div>
+    <div class="step-item"><div class="step-badge">3</div><span>Clique em <b>Gerar</b> e importe no Circuit.</span></div>
 </div>
 """, unsafe_allow_html=True)
 
-# --- ENTRADAS ---
-col1, col2 = st.columns([2, 1])
+# --- ÁREA DE OPERAÇÃO ---
+col_file, col_cage = st.columns([1, 1])
 
-with col1:
-    st.markdown("#### 📄 1. Arquivo do Dia")
-    arquivo_upload = st.file_uploader("", type=["xlsx"], label_visibility="collapsed")
+with col_file:
+    st.markdown("##### 📥 Passo 1: Romaneio")
+    arquivo_upload = st.file_uploader("Upload", type=["xlsx"], label_visibility="collapsed")
 
-with col2:
-    st.markdown("#### 📦 2. Código da Gaiola")
-    gaiola_alvo = st.text_input("", placeholder="Ex: B-50", label_visibility="collapsed").strip().upper()
+with col_cage:
+    st.markdown("##### 📦 Passo 2: Gaiola")
+    gaiola_alvo = st.text_input("Gaiola", placeholder="Ex: B-20", label_visibility="collapsed").strip().upper()
 
-st.markdown("<br>", unsafe_allow_html=True)
-botao_executar = st.button("🚀 GERAR ROTA PARA O CIRCUIT")
+st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+botao_executar = st.button("🚀 GERAR ROTA AGORA")
 
-# --- FUNÇÕES DE LÓGICA ---
+# --- LÓGICA DE PROCESSAMENTO (GROUND ZERO) ---
 def remover_acentos(texto):
     return "".join(c for c in unicodedata.normalize('NFD', str(texto))
                    if unicodedata.category(c) != 'Mn').upper()
@@ -138,8 +199,7 @@ def identificar_comercio(endereco):
         'DEPARTAMENTO', 'VARIEDADES', 'PIZZARIA', 'CHURRASCARIA', 'CARNES', 'PEIXARIA', 
         'FRUTARIA', 'HORTIFRUTI', 'FLORICULTURA'
     ]
-    termos_anuladores = ['FRENTE', 'LADO', 'PROXIMO', 'VIZINHO', 'DEFRONTE', 'ATRAS', 'DEPOIS', 'PERTO', 'VIZINHA', 'AO LADO', 'EM FRENTE', 'NA FRENTE', 'PRÓXIMO', 'PRÓXIMA', 'AO LADO DA', 'EM FRENTE A', 'DE FRENTE PARA',
-                         'EM FRENTE AO', 'EM FRENTE À', 'AO LADO DO', 'AO LADO DA', 'PERTO DE', 'PERTO DO', 'PERTO DA', 'ATRÁS DE', 'ATRÁS DO', 'ATRÁS DA', 'DEPOIS DE', 'DEPOIS DO', 'DEPOIS DA', 'VIZINHO DE', 'POR TRAS']
+    termos_anuladores = ['FRENTE', 'LADO', 'PROXIMO', 'VIZINHO', 'DEFRONTE', 'ATRAS', 'DEPOIS', 'PERTO', 'VIZINHA']
     end_limpo = remover_acentos(endereco)
     partes = end_limpo.split(',')
     for parte in partes:
@@ -154,7 +214,6 @@ def identificar_comercio(endereco):
                     return "🏪 Comércio"
     return "🏠 Residencial"
 
-# --- PROCESSAMENTO ---
 if arquivo_upload is not None and gaiola_alvo and botao_executar:
     with st.spinner('⚙️ Organizando carga...'):
         try:
@@ -175,7 +234,6 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     mask = df_raw[col_gaiola_idx].astype(str).apply(limpar_string) == target_limpo
                     df_filt = df_raw[mask].copy()
                     
-                    # Detecção automática de colunas
                     col_end_idx, col_bairro_idx = None, None
                     for r in range(min(15, len(df_raw))):
                         linha = [str(x).upper() for x in df_raw.iloc[r].values]
@@ -186,7 +244,6 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     if col_end_idx is None:
                         col_end_idx = df_filt.apply(lambda x: x.astype(str).map(len).max()).idxmax()
 
-                    # Criar Planilha de Saída
                     df_filt['CHAVE_STOP'] = df_filt[col_end_idx].apply(extrair_base_endereco)
                     mapa_stops = {end: i + 1 for i, end in enumerate(df_filt['CHAVE_STOP'].unique())}
                     
@@ -198,7 +255,6 @@ if arquivo_upload is not None and gaiola_alvo and botao_executar:
                     bairro = (df_filt[col_bairro_idx].astype(str) + ", ") if col_bairro_idx is not None else ""
                     saida['Endereco_Completo'] = df_filt[col_end_idx].astype(str) + ", " + bairro + "Fortaleza - CE"
 
-                    # Salvar na Sessão (para estabilidade mobile)
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                         saida.to_excel(writer, index=False)
@@ -226,16 +282,14 @@ if st.session_state.dados_prontos:
     m = st.session_state.metricas
     c1, c2, c3 = st.columns(3)
     c1.metric("📦 Pacotes", m["pacotes"])
-    c2.metric("📍 Paradas Reais", m["paradas"])
+    c2.metric("📍 Paradas", m["paradas"])
     c3.metric("🏪 Comércios", m["comercios"])
 
-    # Tabela de Visualização
-    st.markdown("### 📊 Prévia da Rota Gerada")
+    st.markdown("##### 📊 Visualização da Rota")
     st.dataframe(st.session_state.df_visualizacao, use_container_width=True)
 
-    # Botão de Download
     st.download_button(
-        label="📥 CLIQUE AQUI PARA BAIXAR PLANILHA",
+        label="📥 BAIXAR PLANILHA AGORA",
         data=st.session_state.dados_prontos,
         file_name=st.session_state.nome_arquivo,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
